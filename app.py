@@ -661,7 +661,7 @@ def render_summary(df: pd.DataFrame) -> None:
     })
 
     summary_df = pd.DataFrame(summary_rows)
-    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+    st.dataframe(summary_df, width="stretch", hide_index=True)
 
 
 # ============================================================================
@@ -714,7 +714,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
         return [""] * len(row)
 
     styled = display_df.style.apply(_highlight_total_row, axis=1)
-    st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
+    st.dataframe(styled, width="stretch", hide_index=True, height=500)
 
 
 # ============================================================================
