@@ -30,9 +30,15 @@ class TestDataLoading:
 
     def test_report_script_imports(self) -> None:
         """Verify the report script can be imported without errors."""
-        from scripts.generate_slab_report import SLAB_CONFIG, assign_slab, format_indian
+        from scripts.generate_slab_report import (
+            SLAB_CONFIG, assign_slab, format_indian,
+            get_next_slab, points_to_next,
+        )
         assert len(SLAB_CONFIG) > 0
         assert assign_slab(0) == "Unqualified"
+        assert get_next_slab("Unqualified") == "Slab A"
+        assert points_to_next(500, "Unqualified") == 250.0
+        assert get_next_slab("Slab E") is None
 
     def test_load_data_with_file(self, has_data_file: bool) -> None:
         """Test data loading returns a valid DataFrame."""
@@ -57,6 +63,21 @@ class TestDataLoading:
                          "Qualified Volume", "Qualified Points"]
         for col in expected_cols:
             assert col in df.columns, f"Expected column '{col}' not found"
+
+    def test_next_slab_columns_exist(self, has_data_file: bool) -> None:
+        """Verify Next Upgrade Slab and Points to Next Slab columns are computed."""
+        from scripts.generate_slab_report import load_data
+        df = load_data()
+        assert "Next Upgrade Slab" in df.columns
+        assert "Points to Next Slab" in df.columns
+
+    def test_slab_e_has_no_next(self, has_data_file: bool) -> None:
+        """Verify Slab E dealers have None for Next Upgrade Slab."""
+        from scripts.generate_slab_report import load_data
+        df = load_data()
+        slab_e = df[df["Qualified Slab"] == "Slab E"]
+        if len(slab_e) > 0:
+            assert slab_e["Next Upgrade Slab"].isna().all()
 
     def test_generate_report(self, has_data_file: bool) -> None:
         """Test report generation produces an output file."""

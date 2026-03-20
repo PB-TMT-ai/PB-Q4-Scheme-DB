@@ -579,8 +579,8 @@ def render_summary_top(df: pd.DataFrame) -> None:
     kpis = [
         ("Total Dealers", format_indian(total_dealers)),
         ("Total Volume (MT)", format_indian(total_volume, decimal=1)),
-        ("Shop Qual. Volume (MT)", format_indian(total_shop_vol, decimal=1)),
-        ("Site Qual. Volume (MT)", format_indian(total_site_vol, decimal=1)),
+        ("Qual. Shop Vol. (MT)", format_indian(total_shop_vol, decimal=1)),
+        ("Qual. Site Vol. (MT)", format_indian(total_site_vol, decimal=1)),
         ("Qualified Volume (MT)", format_indian(total_qual_vol, decimal=1)),
         ("Total Qualified Points", format_indian(total_points, decimal=1)),
     ]
@@ -655,8 +655,8 @@ def render_summary(df: pd.DataFrame) -> None:
             "Points Range": cfg["range"],
             "Dealer Count": count,
             "Total Volume": format_indian(vol, decimal=1),
-            "Shop Qual. Volume": format_indian(shop_vol, decimal=1),
-            "Site Qual. Volume": format_indian(site_vol, decimal=1),
+            "Qual. Shop Vol.": format_indian(shop_vol, decimal=1),
+            "Qual. Site Vol.": format_indian(site_vol, decimal=1),
             "Qualified Volume": format_indian(qual_vol, decimal=1),
             "Total Points": format_indian(pts, decimal=1),
             "Gift": cfg["gift_full"],
@@ -667,8 +667,8 @@ def render_summary(df: pd.DataFrame) -> None:
         "Points Range": "",
         "Dealer Count": grand_count,
         "Total Volume": format_indian(grand_vol, decimal=1),
-        "Shop Qual. Volume": format_indian(grand_shop_vol, decimal=1),
-        "Site Qual. Volume": format_indian(grand_site_vol, decimal=1),
+        "Qual. Shop Vol.": format_indian(grand_shop_vol, decimal=1),
+        "Qual. Site Vol.": format_indian(grand_site_vol, decimal=1),
         "Qualified Volume": format_indian(grand_qual_vol, decimal=1),
         "Total Points": format_indian(grand_pts, decimal=1),
         "Gift": "",
@@ -708,9 +708,9 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     """Render the Dealer Details tab with per-dealer table and filters.
 
     Filters: Distributor Name, State, Dealer Name, Qualified Slab.
-    Columns: Dealer Name, Distributor Name, State, Region/Zone,
-             Shop Volume, Site Volume, Qualified Volume, Total Volume,
-             Qualified Slab, Qualified Points.
+    Columns: Dealer Name, Distributor Name, State, Zone,
+             Qual. Shop Vol., Qual. Site Vol., Total Volume,
+             Qualified Slab, Next Slab, Volume to Qualify, Qualified Points.
 
     Args:
         df: Full DataFrame.
@@ -722,28 +722,49 @@ def render_dealer_details(df: pd.DataFrame) -> None:
         st.info("No data matches the selected filters.")
         return
 
-    # --- Data Table ---
-    display_cols = [
+    # --- Build display DataFrame ---
+    source_cols = [
         c for c in [
             "Dealer Name", "Distributor Name", "State", "Zone",
-            "Shop Volume", "Site Volume", "Qualified Volume", "Total Volume",
-            "Qualified Slab", "Qualified Points",
+            "Shop Volume", "Site Volume", "Total Volume",
+            "Qualified Slab", "Next Upgrade Slab", "Points to Next Slab",
+            "Qualified Points",
         ]
         if c in filtered.columns
     ]
 
     st.subheader(f"Dealer Details ({len(filtered)} records)")
 
-    # Round numeric columns to 1 decimal
-    display_df = filtered[display_cols].copy()
-    num_cols = ["Shop Volume", "Site Volume", "Qualified Volume", "Total Volume", "Qualified Points"]
+    display_df = filtered[source_cols].copy()
+
+    # Rename columns for display
+    rename_map: dict[str, str] = {
+        "Shop Volume": "Qual. Shop Vol.",
+        "Site Volume": "Qual. Site Vol.",
+        "Next Upgrade Slab": "Next Slab",
+        "Points to Next Slab": "Volume to Qualify",
+    }
+    display_df = display_df.rename(columns=rename_map)
+
+    # Fill None values for Next Slab / Volume to Qualify (Slab E dealers)
+    if "Next Slab" in display_df.columns:
+        display_df["Next Slab"] = display_df["Next Slab"].fillna("-")
+    if "Volume to Qualify" in display_df.columns:
+        display_df["Volume to Qualify"] = pd.to_numeric(
+            display_df["Volume to Qualify"], errors="coerce"
+        ).fillna(0.0)
+
+    # Round all numeric columns to 1 decimal
+    num_cols = [
+        "Qual. Shop Vol.", "Qual. Site Vol.", "Total Volume",
+        "Volume to Qualify", "Qualified Points",
+    ]
     for col in num_cols:
         if col in display_df.columns:
             display_df[col] = display_df[col].round(1)
 
     def _highlight_by_slab(row: pd.Series) -> list[str]:
         """Apply light slab-based background color to each row."""
-        # Check for total/summary rows first
         for field in ["Dealer Name", "Distributor Name"]:
             val = row.get(field)
             if isinstance(val, str) and "total" in val.lower():
@@ -757,7 +778,8 @@ def render_dealer_details(df: pd.DataFrame) -> None:
 
     def _bold_key_columns(col: pd.Series) -> list[str]:
         """Bold key columns: Dealer Name, Qualified Slab, Qualified Points."""
-        if col.name in ("Dealer Name", "Qualified Slab", "Qualified Points"):
+        if col.name in ("Dealer Name", "Qualified Slab", "Qualified Points",
+                         "Next Slab", "Volume to Qualify"):
             return ["font-weight: 700"] * len(col)
         return [""] * len(col)
 
