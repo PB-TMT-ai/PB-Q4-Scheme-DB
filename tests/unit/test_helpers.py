@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from app import (
     NEXT_SLAB_MAP,
     SLAB_CODE_MAP,
+    SLAB_COLORS_LIGHT,
     SLAB_CONFIG,
     SLAB_ORDER,
     assign_slab,
@@ -166,9 +167,18 @@ class TestSlabConfig:
 
     def test_all_required_keys(self) -> None:
         required = {"slab", "slab_code", "range", "lower", "upper", "gift",
-                     "gift_full", "category", "color"}
+                     "gift_full", "category", "color", "color_light"}
         for cfg in SLAB_CONFIG:
             assert required.issubset(cfg.keys()), f"Missing keys in {cfg['slab']}"
+
+    def test_color_light_values_are_hex(self) -> None:
+        for cfg in SLAB_CONFIG:
+            assert cfg["color_light"].startswith("#"), f"Invalid color_light in {cfg['slab']}"
+            assert len(cfg["color_light"]) == 7, f"color_light should be #RRGGBB in {cfg['slab']}"
+
+    def test_slab_colors_light_matches_config(self) -> None:
+        for cfg in SLAB_CONFIG:
+            assert SLAB_COLORS_LIGHT[cfg["slab"]] == cfg["color_light"]
 
     def test_slab_order_matches_config(self) -> None:
         assert SLAB_ORDER == [s["slab"] for s in SLAB_CONFIG]

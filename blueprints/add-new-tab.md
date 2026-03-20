@@ -48,9 +48,10 @@ with tab_new:
 ### 4. Available Data Columns
 The DataFrame includes these standard columns (mapped from Excel):
 - `Dealer Name`, `Distributor Name`, `State`, `District`, `Zone`
-- `Shop Volume`, `Site Volume`, `Total Volume`, `Qualified Volume`
+- `Shop Volume` (Qual. Shop Vol.), `Site Volume` (Qual. Site Vol.)
+- `Total Volume`, `Qualified Volume`
 - `Qualified Points`, `Qualified Slab`, `Q4 Volume`
-- `Next Upgrade Slab`, `Points to Next Slab`
+- `Next Upgrade Slab` (Next Slab), `Points to Next Slab` (Volume to Qualify)
 
 ### 5. Test
 - Verify filters cascade correctly
