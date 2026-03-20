@@ -1187,6 +1187,7 @@ def _render_performance_section(
     slab_mix: pd.DataFrame,
     group_col: str,
     title: str,
+    height: int = 400,
 ) -> None:
     """Render a styled performance table for a given grouping.
 
@@ -1195,6 +1196,7 @@ def _render_performance_section(
         slab_mix: Slab distribution DataFrame.
         group_col: Grouping column name.
         title: Subheader title text.
+        height: Table height in pixels.
     """
     total_rows = len(agg_df)
     st.subheader(f"{title} ({total_rows})")
@@ -1256,7 +1258,7 @@ def _render_performance_section(
         .apply(_highlight_qual, axis=1)
         .apply(_bold_key, axis=0)
     )
-    st.dataframe(styled, use_container_width=True, hide_index=True, height=400)
+    st.dataframe(styled, use_container_width=True, hide_index=True, height=height)
 
 
 def render_performance_overview(df: pd.DataFrame) -> None:
@@ -1302,7 +1304,7 @@ def render_performance_overview(df: pd.DataFrame) -> None:
     # --- Zone-wise table ---
     if "Zone" in df.columns:
         zone_agg, zone_slab = _build_performance_table(df, "Zone")
-        _render_performance_section(zone_agg, zone_slab, "Zone", "Zone-wise Performance")
+        _render_performance_section(zone_agg, zone_slab, "Zone", "Zone-wise Performance", height=200)
         st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
 
     # --- State-wise table ---
