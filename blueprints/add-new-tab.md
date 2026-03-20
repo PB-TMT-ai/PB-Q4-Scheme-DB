@@ -13,12 +13,11 @@ Create a new function in app.py following the pattern:
 # SECTION N — TAB: <TAB_NAME>
 # ============================================================================
 
-def render_<tab_name>(df: pd.DataFrame, month_cols: list[str]) -> None:
+def render_<tab_name>(df: pd.DataFrame) -> None:
     """Render the <Tab Name> tab.
 
     Args:
         df: Full DataFrame.
-        month_cols: List of month column names.
     """
     filtered = render_cascading_filters(df, key="<tab_key>")
 
@@ -36,7 +35,7 @@ Add the tab to the `st.tabs()` call and wire up the renderer:
 tabs = st.tabs([..., "🆕 New Tab"])
 # ...
 with tab_new:
-    render_<tab_name>(df, month_cols)
+    render_<tab_name>(df)
 ```
 
 ### 3. Key Rules
@@ -46,7 +45,14 @@ with tab_new:
 - Use Plotly `graph_objects` for charts (not `plotly.express`)
 - Follow the CSS design system (`.kpi-card`, `.slab-card` classes)
 
-### 4. Test
+### 4. Available Data Columns
+The DataFrame includes these standard columns (mapped from Excel):
+- `Dealer Name`, `Distributor Name`, `State`, `District`, `Zone`
+- `Shop Volume`, `Site Volume`, `Total Volume`, `Qualified Volume`
+- `Qualified Points`, `Qualified Slab`, `Q4 Volume`
+- `Next Upgrade Slab`, `Points to Next Slab`
+
+### 5. Test
 - Verify filters cascade correctly
 - Verify empty state displays info message
-- Verify charts render with sample data
+- Verify charts render with data

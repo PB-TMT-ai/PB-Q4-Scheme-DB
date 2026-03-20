@@ -2,7 +2,7 @@
 Standalone Slab Report Generator
 ================================
 Generates a formatted Excel report with slab analysis based on
-qualified points. Outputs to .workspace/ directory.
+qualified points from the source data. Outputs to .workspace/ directory.
 
 Usage:
     python scripts/generate_slab_report.py
@@ -38,91 +38,52 @@ OUTPUT_DIR: str = str(PROJECT_ROOT / ".workspace")
 SHEET_NAME: str = "Sheet1"
 HEADER_ROW: int = 0
 
-MONTH_LABELS: list[str] = [
-    "Apr", "May", "Jun", "Jul", "Aug", "Sep",
-    "Oct", "Nov", "Dec", "Jan", "Feb", "Mar",
-]
+# Column name mapping: Excel column → internal standard name
+COLUMN_MAP: dict[str, str] = {
+    "Retailer Name": "Dealer Name",
+    "State Name": "State",
+    "District Name": "District",
+    "Shop vol.": "Shop Volume",
+    "Site vol.": "Site Volume",
+    "Total vol. under scheme": "Qualified Volume",
+    "Total site vol.": "Total Site Volume",
+    "Points": "Qualified Points",
+    "Current gift": "Gift",
+    "Current gift slab": "Current Slab",
+    "Distributor self-counter (Yes/No)": "Self Counter",
+    "Jan + Feb+Mar": "Q4 Volume",
+    "# Unique Site >200 MT": "Unique Site >200 MT",
+}
 
 SLAB_CONFIG: list[dict] = [
-    {"slab": "Unqualified", "range": "0 – 749", "lower": 0, "upper": 750,
-     "gift": "No Gift", "gift_full": "Below minimum qualification",
-     "category": "Unqualified", "color": "#94a3b8"},
-    {"slab": "Slab A", "range": "750 – 2,999", "lower": 750, "upper": 3000,
-     "gift": "Foot Massager", "gift_full": "Foot massager",
-     "category": "A", "color": "#f59e0b"},
-    {"slab": "Slab B", "range": "3,000 – 4,199", "lower": 3000, "upper": 4200,
-     "gift": "Sony Sound Bar", "gift_full": "Sony - sound bar, woofer and speakers",
+    {"slab": "Unqualified", "slab_code": "-", "range": "0 – 749",
+     "lower": 0, "upper": 750, "gift": "No Gift",
+     "gift_full": "No Gift", "category": "Unqualified", "color": "#94a3b8"},
+    {"slab": "Slab A", "slab_code": "A", "range": "750 – 2,999",
+     "lower": 750, "upper": 3000, "gift": "Foot Massager",
+     "gift_full": "Foot massager", "category": "A", "color": "#f59e0b"},
+    {"slab": "Slab B", "slab_code": "B", "range": "3,000 – 4,199",
+     "lower": 3000, "upper": 4200, "gift": "Sony Sound Bar",
+     "gift_full": "Sony - Sound bar, woofer and speakers",
      "category": "B", "color": "#6366f1"},
-    {"slab": "Slab C", "range": "4,200 – 6,799", "lower": 4200, "upper": 6800,
-     "gift": "Robot Vacuum", "gift_full": "Robot Vacuum cleaner",
-     "category": "C", "color": "#10b981"},
-    {"slab": "Slab D", "range": "6,800 – 7,499", "lower": 6800, "upper": 7500,
-     "gift": "Apple iPad", "gift_full": "Apple iPad",
-     "category": "D", "color": "#3b82f6"},
-    {"slab": "Slab E", "range": "7,500+", "lower": 7500, "upper": float("inf"),
-     "gift": "Washing Machine", "gift_full": "Samsung front-load washing machine",
+    {"slab": "Slab C", "slab_code": "C", "range": "4,200 – 6,799",
+     "lower": 4200, "upper": 6800, "gift": "Robot Vacuum",
+     "gift_full": "Robot Vacuum cleaner", "category": "C", "color": "#10b981"},
+    {"slab": "Slab D", "slab_code": "D", "range": "6,800 – 7,499",
+     "lower": 6800, "upper": 7500, "gift": "Apple iPad",
+     "gift_full": "Apple iPad", "category": "D", "color": "#3b82f6"},
+    {"slab": "Slab E", "slab_code": "E", "range": "7,500+",
+     "lower": 7500, "upper": float("inf"), "gift": "Washing Machine",
+     "gift_full": "Samsung front-load washing machine",
      "category": "E", "color": "#ec4899"},
 ]
 
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
-
-POINTS_CONFIG: dict = {
-    "min_volume_mt": 30,
-    "points_per_mt": 25,
-    "milestones": [
-        {"threshold": 200, "bonus_pct": 50},
-        {"threshold": 150, "bonus_pct": 30},
-        {"threshold": 100, "bonus_pct": 20},
-        {"threshold": 50, "bonus_pct": 10},
-    ],
-}
+SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
 
 # ---------------------------------------------------------------------------
 # HELPERS (mirrored from app.py)
 # ---------------------------------------------------------------------------
-
-
-def calculate_qualified_volume(shop_vol: float, site_vol: float) -> float:
-    """Calculate qualified volume from shop and site volumes.
-
-    Args:
-        shop_vol: Total shop volume.
-        site_vol: Total site volume (pre-capped).
-
-    Returns:
-        Combined qualified volume.
-    """
-    shop = float(shop_vol) if not pd.isna(shop_vol) else 0.0
-    site = float(site_vol) if not pd.isna(site_vol) else 0.0
-    return shop + site
-
-
-def calculate_qualified_points(qualified_vol_mt: float) -> float:
-    """Calculate qualified points from qualified volume.
-
-    Args:
-        qualified_vol_mt: Qualified volume in MT.
-
-    Returns:
-        Calculated points (rounded to nearest integer).
-    """
-    if pd.isna(qualified_vol_mt):
-        qualified_vol_mt = 0.0
-    vol = float(qualified_vol_mt)
-
-    if vol < POINTS_CONFIG["min_volume_mt"]:
-        return 0.0
-
-    base_points = vol * POINTS_CONFIG["points_per_mt"]
-
-    bonus_pct = 0
-    for milestone in POINTS_CONFIG["milestones"]:
-        if vol >= milestone["threshold"]:
-            bonus_pct = milestone["bonus_pct"]
-            break
-
-    total = base_points * (1 + bonus_pct / 100)
-    return round(total)
 
 
 def assign_slab(points: float) -> str:
@@ -207,11 +168,14 @@ def _find_excel_file() -> Path:
 # ---------------------------------------------------------------------------
 
 
-def load_data() -> tuple[pd.DataFrame, list[str]]:
+def load_data() -> pd.DataFrame:
     """Load and clean Excel data (no Streamlit dependency).
 
+    Reads the latest .xlsx from DATA_DIR, renames columns to standard names,
+    excludes self-counter dealers, and uses pre-calculated Points from Excel.
+
     Returns:
-        Tuple of (cleaned DataFrame, list of month column names).
+        Cleaned DataFrame with slab assignments.
     """
     file_path = _find_excel_file()
     log_info(f"Loading data from {file_path}")
@@ -223,60 +187,60 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
         engine="openpyxl",
     )
 
-    # Rename month columns
-    col_map: dict[str, str] = {}
-    month_cols: list[str] = []
+    # --- Rename columns to standard names ---
+    rename_map = {k: v for k, v in COLUMN_MAP.items() if k in df.columns}
+    df = df.rename(columns=rename_map)
+    log_info(f"Renamed columns: {list(rename_map.values())}")
 
-    for col in df.columns:
-        matched = False
-        if hasattr(col, "strftime"):
-            short = col.strftime("%b")
-            if short in MONTH_LABELS and short not in col_map.values():
-                col_map[col] = short
-                month_cols.append(short)
-                matched = True
-        if not matched and isinstance(col, str):
-            col_str = col.strip()
-            for label in MONTH_LABELS:
-                if col_str.lower().startswith(label.lower()) and label not in col_map.values():
-                    col_map[col] = label
-                    month_cols.append(label)
-                    break
+    # --- Exclude self-counter dealers ---
+    if "Self Counter" in df.columns:
+        before = len(df)
+        df["Self Counter"] = df["Self Counter"].fillna("").astype(str).str.strip().str.title()
+        df = df[df["Self Counter"] != "Yes"].copy()
+        excluded = before - len(df)
+        log_info(f"Excluded {excluded} self-counter dealers ({len(df)} remaining)")
 
-    if col_map:
-        df = df.rename(columns=col_map)
-
-    if not month_cols:
-        for label in MONTH_LABELS:
-            if label in df.columns:
-                month_cols.append(label)
-
-    # Coerce numerics
-    for col in month_cols:
+    # --- Coerce numeric columns ---
+    numeric_cols = [
+        "Qualified Volume", "Total Site Volume", "Qualified Points",
+        "Shop Volume", "Site Volume", "Q4 Volume", "Unique Site >200 MT",
+    ]
+    for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
-    # Total Volume
-    if month_cols and "Total Volume" not in df.columns:
-        df["Total Volume"] = df[month_cols].sum(axis=1)
+    # --- Clean text columns ---
+    text_cols = ["Dealer Name", "Distributor Name", "State", "District", "Zone"]
+    for col in text_cols:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .str.title()
+                .replace({"Nan": "", "None": "", "0": "", "0.0": ""})
+            )
 
-    # Shop / Site volumes
-    for vol_col in ["Shop Volume", "Site Volume"]:
-        if vol_col in df.columns:
-            df[vol_col] = pd.to_numeric(df[vol_col], errors="coerce").fillna(0.0)
-        else:
-            df[vol_col] = 0.0
+    # --- Total Volume (Shop + Site) ---
+    if "Shop Volume" in df.columns and "Site Volume" in df.columns:
+        df["Total Volume"] = df["Shop Volume"] + df["Site Volume"]
+    elif "Q4 Volume" in df.columns:
+        df["Total Volume"] = df["Q4 Volume"]
+    else:
+        df["Total Volume"] = 0.0
 
-    # Derived columns
-    df["Qualified Volume"] = df.apply(
-        lambda row: calculate_qualified_volume(row["Shop Volume"], row["Site Volume"]),
-        axis=1,
-    )
-    df["Qualified Points"] = df["Qualified Volume"].apply(calculate_qualified_points)
-    df["Qualified Slab"] = df["Qualified Points"].apply(assign_slab)
+    # --- Derive Qualified Slab from pre-calculated Points ---
+    if "Qualified Points" in df.columns:
+        df["Qualified Slab"] = df["Qualified Points"].apply(assign_slab)
+    elif "Current Slab" in df.columns:
+        df["Current Slab"] = df["Current Slab"].fillna("-").astype(str).str.strip()
+        df["Qualified Slab"] = df["Current Slab"].map(SLAB_CODE_MAP).fillna("Unqualified")
+    else:
+        df["Qualified Slab"] = "Unqualified"
 
     log_info(f"Loaded {len(df)} rows")
-    return df, month_cols
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -324,12 +288,11 @@ def _style_header_row(ws: object, num_cols: int) -> None:
         cell.border = THIN_BORDER
 
 
-def generate_report(df: pd.DataFrame, month_cols: list[str]) -> Path:
+def generate_report(df: pd.DataFrame) -> Path:
     """Generate a formatted Excel slab report.
 
     Args:
         df: Cleaned DataFrame with slab assignments.
-        month_cols: List of month column names.
 
     Returns:
         Path to the generated report file.
@@ -369,7 +332,7 @@ def generate_report(df: pd.DataFrame, month_cols: list[str]) -> Path:
     ws_detail.sheet_properties.tabColor = "10B981"
 
     detail_cols = [
-        c for c in ["Dealer Name", "Distributor Name", "State", "Region",
+        c for c in ["Dealer Name", "Distributor Name", "State", "Zone",
                      "Shop Volume", "Site Volume", "Total Volume",
                      "Qualified Volume", "Qualified Slab", "Qualified Points"]
         if c in df.columns
@@ -397,8 +360,8 @@ def generate_report(df: pd.DataFrame, month_cols: list[str]) -> Path:
 def main() -> None:
     """Load data and generate the slab report."""
     try:
-        df, month_cols = load_data()
-        output = generate_report(df, month_cols)
+        df = load_data()
+        output = generate_report(df)
         print(f"\nReport generated: {output}")
     except FileNotFoundError as e:
         log_error(str(e))
