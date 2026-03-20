@@ -993,7 +993,303 @@ def render_dealer_details(df: pd.DataFrame) -> None:
 
 
 # ============================================================================
-# SECTION 8 — MAIN
+# SECTION 8 — TAB: NEAR-UPGRADE ANALYSIS
+# ============================================================================
+
+def render_near_upgrade(df: pd.DataFrame) -> None:
+    """Render the Near-Upgrade Analysis tab showing dealers close to next slab.
+
+    Displays dealers within a configurable points threshold of upgrading,
+    sorted by points remaining (ascending) so the sales team can prioritize.
+
+    Args:
+        df: Filtered DataFrame.
+    """
+    if df.empty:
+        st.info("No data matches the selected filters.")
+        return
+
+    # Only dealers with a next slab (exclude Slab E)
+    upgradable = df[df["Qualified Slab"] != SLAB_CONFIG[-1]["slab"]].copy()
+
+    if upgradable.empty:
+        st.info("All dealers are already at the highest slab.")
+        return
+
+    # Compute points gap
+    upgradable["Points Gap"] = upgradable.apply(
+        lambda row: points_to_next(row["Qualified Points"], row["Qualified Slab"]) or 0,
+        axis=1,
+    )
+
+    # --- Threshold selector ---
+    threshold = st.slider(
+        "Show dealers within N points of next slab",
+        min_value=100,
+        max_value=2000,
+        value=500,
+        step=100,
+        key="near_upgrade_threshold",
+    )
+
+    near = upgradable[upgradable["Points Gap"] <= threshold].copy()
+    near = near.sort_values("Points Gap", ascending=True)
+
+    # --- KPI row ---
+    total_near = len(near)
+    st.markdown(f'<div class="section-title">Dealers within {threshold} points of upgrade</div>',
+                unsafe_allow_html=True)
+
+    if total_near == 0:
+        st.info(f"No dealers are within {threshold} points of the next slab.")
+        return
+
+    # Breakdown by target slab
+    near["Target Slab"] = near["Qualified Slab"].apply(get_next_slab)
+    target_counts = near["Target Slab"].value_counts()
+
+    kpi_cols = st.columns(min(len(target_counts) + 1, 6))
+    with kpi_cols[0]:
+        st.markdown(
+            f"""
+            <div class="kpi-card">
+                <div class="kpi-label">Total Near-Upgrade</div>
+                <div class="kpi-value">{total_near}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    for i, (target, count) in enumerate(target_counts.items()):
+        if i + 1 >= len(kpi_cols):
+            break
+        color = SLAB_COLORS.get(target, "#64748b")
+        with kpi_cols[i + 1]:
+            st.markdown(
+                f"""
+                <div class="kpi-card" style="border-top-color: {color};">
+                    <div class="kpi-label">Near {target}</div>
+                    <div class="kpi-value" style="color: {color};">{count}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- Detail table ---
+    st.subheader(f"Near-Upgrade Dealers ({total_near} records)")
+
+    display_cols = [
+        c for c in [
+            "Dealer Name", "Distributor Name", "State", "Zone",
+            "Qualified Points", "Qualified Slab", "Target Slab", "Points Gap",
+            "Total Volume",
+        ]
+        if c in near.columns
+    ]
+
+    display_df = near[display_cols].copy()
+
+    # Rename for display
+    display_df = display_df.rename(columns={
+        "Target Slab": "Next Slab",
+        "Points Gap": "Pts to Upgrade",
+    })
+
+    # Round numerics to whole numbers
+    for col in ["Qualified Points", "Pts to Upgrade", "Total Volume"]:
+        if col in display_df.columns:
+            display_df[col] = pd.to_numeric(
+                display_df[col], errors="coerce"
+            ).fillna(0).round(0).astype(int)
+
+    def _highlight_urgency(row: pd.Series) -> list[str]:
+        """Color rows by upgrade urgency: green for close, yellow for moderate."""
+        pts = row.get("Pts to Upgrade", 999)
+        if pts <= 100:
+            return ["background-color: #d1fae5"] * len(row)
+        if pts <= 300:
+            return ["background-color: #fef3c7"] * len(row)
+        return ["background-color: #f1f5f9"] * len(row)
+
+    def _bold_key_cols(col: pd.Series) -> list[str]:
+        """Bold key columns."""
+        if col.name in ("Dealer Name", "Pts to Upgrade", "Next Slab"):
+            return ["font-weight: 700"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        display_df.style
+        .apply(_highlight_urgency, axis=1)
+        .apply(_bold_key_cols, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
+
+
+# ============================================================================
+# SECTION 9 — TAB: DISTRIBUTOR PERFORMANCE
+# ============================================================================
+
+def render_distributor_performance(df: pd.DataFrame) -> None:
+    """Render the Distributor Performance tab with aggregated distributor metrics.
+
+    Shows dealer count, total volume, avg points, and slab distribution
+    per distributor. Highlights top and bottom performers.
+
+    Args:
+        df: Filtered DataFrame.
+    """
+    if df.empty or "Distributor Name" not in df.columns:
+        st.info("No data available for distributor analysis.")
+        return
+
+    # --- Aggregate by distributor ---
+    dist_agg = df.groupby("Distributor Name", as_index=False).agg(
+        Dealers=("Dealer Name", "count"),
+        Total_Volume=("Total Volume", "sum"),
+        Avg_Points=("Qualified Points", "mean"),
+        Total_Points=("Qualified Points", "sum"),
+        Shop_Volume=("Shop Volume", "sum"),
+        Site_Volume=("Site Volume", "sum"),
+    )
+    dist_agg = dist_agg[dist_agg["Distributor Name"].str.strip() != ""]
+    dist_agg = dist_agg.sort_values("Dealers", ascending=False)
+
+    total_distributors = len(dist_agg)
+
+    # --- Slab mix per distributor ---
+    slab_mix = (
+        df.groupby(["Distributor Name", "Qualified Slab"])
+        .size()
+        .unstack(fill_value=0)
+    )
+    # Ensure all slabs are present as columns
+    for slab_name in SLAB_ORDER:
+        if slab_name not in slab_mix.columns:
+            slab_mix[slab_name] = 0
+    slab_mix = slab_mix[SLAB_ORDER]
+
+    # Qualified rate = dealers NOT in "Unqualified" / total
+    if "Unqualified" in slab_mix.columns:
+        slab_mix["Qualified Rate"] = (
+            (slab_mix.drop(columns=["Unqualified"]).sum(axis=1))
+            / slab_mix.sum(axis=1)
+            * 100
+        )
+    else:
+        slab_mix["Qualified Rate"] = 100.0
+
+    dist_agg = dist_agg.merge(
+        slab_mix[["Qualified Rate"]],
+        left_on="Distributor Name",
+        right_index=True,
+        how="left",
+    )
+
+    # --- KPI cards ---
+    st.markdown('<div class="section-title">Distributor Overview</div>',
+                unsafe_allow_html=True)
+
+    avg_dealers_per_dist = dist_agg["Dealers"].mean()
+    top_dist = dist_agg.iloc[0]["Distributor Name"] if len(dist_agg) > 0 else "-"
+    avg_qual_rate = dist_agg["Qualified Rate"].mean()
+
+    kpi_cols = st.columns(4)
+    kpis = [
+        ("Total Distributors", format_indian(total_distributors)),
+        ("Avg. Dealers / Distributor", format_indian(avg_dealers_per_dist, decimal=1)),
+        ("Avg. Qualification Rate", f"{avg_qual_rate:.1f}%"),
+        ("Top Distributor", top_dist[:25]),
+    ]
+    for col, (label, value) in zip(kpi_cols, kpis):
+        with col:
+            st.markdown(
+                f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value" style="font-size: 1.1rem;">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- Performance table ---
+    st.subheader(f"Distributor Performance ({total_distributors} distributors)")
+
+    # Build display dataframe
+    display_df = dist_agg.copy()
+    display_df = display_df.rename(columns={
+        "Total_Volume": "Total Volume",
+        "Avg_Points": "Avg Points",
+        "Total_Points": "Total Points",
+        "Shop_Volume": "Qual. Shop Vol.",
+        "Site_Volume": "Qual. Site Vol.",
+        "Qualified Rate": "Qual. Rate %",
+    })
+
+    # Add slab distribution columns
+    for slab_name in SLAB_ORDER:
+        if slab_name in slab_mix.columns:
+            display_df = display_df.merge(
+                slab_mix[[slab_name]],
+                left_on="Distributor Name",
+                right_index=True,
+                how="left",
+            )
+
+    display_cols = [
+        c for c in [
+            "Distributor Name", "Dealers", "Total Volume",
+            "Qual. Shop Vol.", "Qual. Site Vol.",
+            "Avg Points", "Total Points", "Qual. Rate %",
+        ] + SLAB_ORDER
+        if c in display_df.columns
+    ]
+    display_df = display_df[display_cols]
+
+    # Round numerics
+    int_cols = ["Dealers", "Total Volume", "Qual. Shop Vol.", "Qual. Site Vol.",
+                "Total Points"] + SLAB_ORDER
+    for col in int_cols:
+        if col in display_df.columns:
+            display_df[col] = pd.to_numeric(
+                display_df[col], errors="coerce"
+            ).fillna(0).round(0).astype(int)
+
+    for col in ["Avg Points", "Qual. Rate %"]:
+        if col in display_df.columns:
+            display_df[col] = pd.to_numeric(
+                display_df[col], errors="coerce"
+            ).fillna(0).round(1)
+
+    def _highlight_qual_rate(row: pd.Series) -> list[str]:
+        """Color rows by qualification rate."""
+        rate = row.get("Qual. Rate %", 0)
+        if rate >= 60:
+            return ["background-color: #d1fae5"] * len(row)
+        if rate >= 30:
+            return ["background-color: #fef3c7"] * len(row)
+        return ["background-color: #fee2e2"] * len(row)
+
+    def _bold_dist_cols(col: pd.Series) -> list[str]:
+        """Bold key columns."""
+        if col.name in ("Distributor Name", "Dealers", "Qual. Rate %"):
+            return ["font-weight: 700"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        display_df.style
+        .apply(_highlight_qual_rate, axis=1)
+        .apply(_bold_dist_cols, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
+
+
+# ============================================================================
+# SECTION 10 — MAIN
 # ============================================================================
 
 def main() -> None:
@@ -1040,9 +1336,11 @@ def main() -> None:
     render_summary_top(filtered_df)
 
     # --- Tabs ---
-    tab_summary, tab_details = st.tabs([
+    tab_summary, tab_details, tab_upgrade, tab_distributor = st.tabs([
         "📊 Summary",
         "🔍 Dealer Details",
+        "🎯 Near-Upgrade",
+        "🏢 Distributor Performance",
     ])
 
     with tab_summary:
@@ -1050,6 +1348,12 @@ def main() -> None:
 
     with tab_details:
         render_dealer_details(filtered_df)
+
+    with tab_upgrade:
+        render_near_upgrade(filtered_df)
+
+    with tab_distributor:
+        render_distributor_performance(filtered_df)
 
 
 if __name__ == "__main__":

@@ -58,7 +58,15 @@ The DataFrame includes these standard columns (mapped from Excel):
 are applied before tabs. New tab renderers receive the pre-filtered DataFrame.
 Use a unique `key` prefix only for any additional tab-specific filters.
 
-### 5. Test
+### 5. Existing Tabs (for reference)
+| Section | Tab | Renderer | Key |
+|---------|-----|----------|-----|
+| 6 | Summary | `render_summary_top` + `render_summary` | `global` |
+| 7 | Dealer Details | `render_dealer_details` | `dealer_detail` |
+| 8 | Near-Upgrade | `render_near_upgrade` | `near_upgrade_threshold` |
+| 9 | Distributor Performance | `render_distributor_performance` | — |
+
+### 6. Test
 - Verify filters cascade correctly
 - Verify empty state displays info message
 - Verify charts render with data

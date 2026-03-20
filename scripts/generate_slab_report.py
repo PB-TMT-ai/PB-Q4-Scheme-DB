@@ -437,6 +437,102 @@ def generate_report(df: pd.DataFrame) -> Path:
     _auto_width(ws_detail)
     ws_detail.freeze_panes = "A2"
 
+    # --- Sheet 3: Near-Upgrade ---
+    ws_upgrade = wb.create_sheet("Near-Upgrade")
+    ws_upgrade.sheet_properties.tabColor = "F59E0B"
+
+    upgrade_headers = [
+        "Dealer Name", "Distributor Name", "State", "Zone",
+        "Qualified Points", "Qualified Slab", "Next Slab", "Pts to Upgrade",
+        "Total Volume",
+    ]
+    ws_upgrade.append(upgrade_headers)
+
+    # Filter to upgradable dealers (exclude top slab) within 500 pts
+    last_slab = SLAB_CONFIG[-1]["slab"]
+    upgradable = df[df["Qualified Slab"] != last_slab].copy()
+    if "Qualified Points" in upgradable.columns:
+        upgradable["Points Gap"] = upgradable.apply(
+            lambda row: points_to_next(row["Qualified Points"], row["Qualified Slab"]) or 0,
+            axis=1,
+        )
+        near = upgradable[upgradable["Points Gap"] <= 500].sort_values("Points Gap")
+
+        for _, row in near.iterrows():
+            ws_upgrade.append([
+                row.get("Dealer Name", ""),
+                row.get("Distributor Name", ""),
+                row.get("State", ""),
+                row.get("Zone", ""),
+                int(round(float(row.get("Qualified Points", 0)))),
+                row.get("Qualified Slab", ""),
+                get_next_slab(row.get("Qualified Slab", "")) or "-",
+                int(round(float(row.get("Points Gap", 0)))),
+                int(round(float(row.get("Total Volume", 0)))),
+            ])
+
+    _style_header_row(ws_upgrade, len(upgrade_headers))
+    _auto_width(ws_upgrade)
+    ws_upgrade.freeze_panes = "A2"
+
+    # --- Sheet 4: Distributor Performance ---
+    ws_dist = wb.create_sheet("Distributor Performance")
+    ws_dist.sheet_properties.tabColor = "6366F1"
+
+    dist_headers = [
+        "Distributor Name", "Dealers", "Total Volume",
+        "Qual. Shop Vol.", "Qual. Site Vol.",
+        "Avg Points", "Total Points", "Qual. Rate %",
+    ] + SLAB_ORDER
+    ws_dist.append(dist_headers)
+
+    dist_agg = df.groupby("Distributor Name").agg(
+        Dealers=("Dealer Name", "count"),
+        Total_Volume=("Total Volume", "sum"),
+        Avg_Points=("Qualified Points", "mean"),
+        Total_Points=("Qualified Points", "sum"),
+        Shop_Volume=("Shop Volume", "sum"),
+        Site_Volume=("Site Volume", "sum"),
+    )
+    dist_agg = dist_agg[dist_agg.index.str.strip() != ""]
+    dist_agg = dist_agg.sort_values("Dealers", ascending=False)
+
+    slab_mix = df.groupby(["Distributor Name", "Qualified Slab"]).size().unstack(fill_value=0)
+    for slab_name in SLAB_ORDER:
+        if slab_name not in slab_mix.columns:
+            slab_mix[slab_name] = 0
+    slab_mix = slab_mix[SLAB_ORDER]
+
+    if "Unqualified" in slab_mix.columns:
+        slab_mix["Qualified Rate"] = (
+            slab_mix.drop(columns=["Unqualified"]).sum(axis=1)
+            / slab_mix.sum(axis=1) * 100
+        )
+    else:
+        slab_mix["Qualified Rate"] = 100.0
+
+    for dist_name in dist_agg.index:
+        row_data = dist_agg.loc[dist_name]
+        qual_rate = slab_mix.loc[dist_name, "Qualified Rate"] if dist_name in slab_mix.index else 0
+        slab_counts = [
+            int(slab_mix.loc[dist_name, s]) if dist_name in slab_mix.index else 0
+            for s in SLAB_ORDER
+        ]
+        ws_dist.append([
+            dist_name,
+            int(row_data["Dealers"]),
+            int(round(float(row_data["Total_Volume"]))),
+            int(round(float(row_data["Shop_Volume"]))),
+            int(round(float(row_data["Site_Volume"]))),
+            round(float(row_data["Avg_Points"]), 1),
+            int(round(float(row_data["Total_Points"]))),
+            round(float(qual_rate), 1),
+        ] + slab_counts)
+
+    _style_header_row(ws_dist, len(dist_headers))
+    _auto_width(ws_dist)
+    ws_dist.freeze_panes = "A2"
+
     # Save
     wb.save(str(output_path))
     log_info(f"Report saved to {output_path}")
