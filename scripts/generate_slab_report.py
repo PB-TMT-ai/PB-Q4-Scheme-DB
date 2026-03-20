@@ -381,9 +381,9 @@ def generate_report(df: pd.DataFrame) -> Path:
         qual = slab_df["Qualified Volume"].sum() if "Qualified Volume" in slab_df.columns else 0
         pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
         ws_summary.append([
-            cfg["slab"], cfg["range"], count, round(vol, 1),
-            round(shop_vol, 1), round(site_vol, 1),
-            round(qual, 1), round(pts, 1), cfg["gift_full"],
+            cfg["slab"], cfg["range"], count, int(round(vol)),
+            int(round(shop_vol)), int(round(site_vol)),
+            int(round(qual)), int(round(pts)), cfg["gift_full"],
         ])
 
     _style_header_row(ws_summary, len(headers))
@@ -524,14 +524,77 @@ def generate_report(df: pd.DataFrame) -> Path:
             int(round(float(row_data["Total_Volume"]))),
             int(round(float(row_data["Shop_Volume"]))),
             int(round(float(row_data["Site_Volume"]))),
-            round(float(row_data["Avg_Points"]), 1),
+            int(round(float(row_data["Avg_Points"]))),
             int(round(float(row_data["Total_Points"]))),
-            round(float(qual_rate), 1),
+            int(round(float(qual_rate))),
         ] + slab_counts)
 
     _style_header_row(ws_dist, len(dist_headers))
     _auto_width(ws_dist)
     ws_dist.freeze_panes = "A2"
+
+    # --- Sheet 5: Zone Analysis ---
+    ws_zone = wb.create_sheet("Zone Analysis")
+    ws_zone.sheet_properties.tabColor = "10B981"
+
+    zone_headers = [
+        "Zone", "Dealers", "Total Volume",
+        "Qual. Shop Vol.", "Qual. Site Vol.",
+        "Avg Points", "Total Points", "Qual. Rate %",
+    ] + SLAB_ORDER
+    ws_zone.append(zone_headers)
+
+    zone_agg = df.groupby("Zone").agg(
+        Dealers=("Dealer Name", "count"),
+        Total_Volume=("Total Volume", "sum"),
+        Avg_Points=("Qualified Points", "mean"),
+        Total_Points=("Qualified Points", "sum"),
+        Shop_Volume=("Shop Volume", "sum"),
+        Site_Volume=("Site Volume", "sum"),
+    )
+    zone_agg = zone_agg[zone_agg.index.str.strip() != ""]
+    zone_agg = zone_agg.sort_values("Dealers", ascending=False)
+
+    zone_slab_mix = (
+        df[df["Zone"].str.strip() != ""]
+        .groupby(["Zone", "Qualified Slab"])
+        .size()
+        .unstack(fill_value=0)
+    )
+    for slab_name in SLAB_ORDER:
+        if slab_name not in zone_slab_mix.columns:
+            zone_slab_mix[slab_name] = 0
+    zone_slab_mix = zone_slab_mix[SLAB_ORDER]
+
+    if "Unqualified" in zone_slab_mix.columns:
+        zone_slab_mix["Qualified Rate"] = (
+            zone_slab_mix.drop(columns=["Unqualified"]).sum(axis=1)
+            / zone_slab_mix.sum(axis=1) * 100
+        )
+    else:
+        zone_slab_mix["Qualified Rate"] = 100.0
+
+    for zone_name in zone_agg.index:
+        row_data = zone_agg.loc[zone_name]
+        qual_rate = zone_slab_mix.loc[zone_name, "Qualified Rate"] if zone_name in zone_slab_mix.index else 0
+        slab_counts = [
+            int(zone_slab_mix.loc[zone_name, s]) if zone_name in zone_slab_mix.index else 0
+            for s in SLAB_ORDER
+        ]
+        ws_zone.append([
+            zone_name,
+            int(row_data["Dealers"]),
+            int(round(float(row_data["Total_Volume"]))),
+            int(round(float(row_data["Shop_Volume"]))),
+            int(round(float(row_data["Site_Volume"]))),
+            int(round(float(row_data["Avg_Points"]))),
+            int(round(float(row_data["Total_Points"]))),
+            int(round(float(qual_rate))),
+        ] + slab_counts)
+
+    _style_header_row(ws_zone, len(zone_headers))
+    _auto_width(ws_zone)
+    ws_zone.freeze_panes = "A2"
 
     # Save
     wb.save(str(output_path))

@@ -65,6 +65,7 @@ Use a unique `key` prefix only for any additional tab-specific filters.
 | 7 | Dealer Details | `render_dealer_details` | `dealer_detail` |
 | 8 | Near-Upgrade | `render_near_upgrade` | `near_upgrade_threshold` |
 | 9 | Distributor Performance | `render_distributor_performance` | — |
+| 10 | Zone Analysis | `render_zone_analysis` | — |
 
 ### 6. Test
 - Verify filters cascade correctly
