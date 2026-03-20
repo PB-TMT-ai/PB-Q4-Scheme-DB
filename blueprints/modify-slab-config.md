@@ -18,6 +18,7 @@ Add or modify entries in the `SLAB_CONFIG` list. Each entry requires:
 | gift        | str         | Short gift label                     |
 | gift_full   | str         | Full gift description                |
 | category    | str         | Grouping category                    |
+| volume_mt   | float       | Volume (MT) threshold for this slab  |
 | color       | str         | Hex color for UI elements            |
 | color_light | str         | Light hex color for table row backgrounds |
 

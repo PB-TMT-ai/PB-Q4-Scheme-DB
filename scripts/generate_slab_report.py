@@ -59,27 +59,29 @@ SLAB_CONFIG: list[dict] = [
     {"slab": "Unqualified", "slab_code": "-", "range": "0 – 749",
      "lower": 0, "upper": 750, "gift": "No Gift",
      "gift_full": "No Gift", "category": "Unqualified",
-     "color": "#94a3b8", "color_light": "#f1f5f9"},
+     "volume_mt": 0, "color": "#94a3b8", "color_light": "#f1f5f9"},
     {"slab": "Slab A", "slab_code": "A", "range": "750 – 2,999",
      "lower": 750, "upper": 3000, "gift": "Foot Massager",
      "gift_full": "Foot massager", "category": "A",
-     "color": "#f59e0b", "color_light": "#fef3c7"},
+     "volume_mt": 30, "color": "#f59e0b", "color_light": "#fef3c7"},
     {"slab": "Slab B", "slab_code": "B", "range": "3,000 – 4,199",
      "lower": 3000, "upper": 4200, "gift": "Sony Sound Bar",
      "gift_full": "Sony - Sound bar, woofer and speakers",
-     "category": "B", "color": "#6366f1", "color_light": "#e0e7ff"},
+     "category": "B", "volume_mt": 120,
+     "color": "#6366f1", "color_light": "#e0e7ff"},
     {"slab": "Slab C", "slab_code": "C", "range": "4,200 – 6,799",
      "lower": 4200, "upper": 6800, "gift": "Robot Vacuum",
      "gift_full": "Robot Vacuum cleaner", "category": "C",
-     "color": "#10b981", "color_light": "#d1fae5"},
+     "volume_mt": 168, "color": "#10b981", "color_light": "#d1fae5"},
     {"slab": "Slab D", "slab_code": "D", "range": "6,800 – 7,499",
      "lower": 6800, "upper": 7500, "gift": "Apple iPad",
      "gift_full": "Apple iPad", "category": "D",
-     "color": "#3b82f6", "color_light": "#dbeafe"},
+     "volume_mt": 272, "color": "#3b82f6", "color_light": "#dbeafe"},
     {"slab": "Slab E", "slab_code": "E", "range": "7,500+",
      "lower": 7500, "upper": float("inf"), "gift": "Washing Machine",
      "gift_full": "Samsung front-load washing machine",
-     "category": "E", "color": "#ec4899", "color_light": "#fce7f3"},
+     "category": "E", "volume_mt": 300,
+     "color": "#ec4899", "color_light": "#fce7f3"},
 ]
 
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
@@ -89,12 +91,16 @@ SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
 # Next-slab mapping (mirrored from app.py)
 NEXT_SLAB_MAP: dict[str, Optional[str]] = {}
 NEXT_SLAB_THRESHOLD: dict[str, Optional[float]] = {}
+NEXT_SLAB_VOLUME: dict[str, Optional[float]] = {}
 for _i, _cfg in enumerate(SLAB_CONFIG):
     NEXT_SLAB_MAP[_cfg["slab"]] = (
         SLAB_CONFIG[_i + 1]["slab"] if _i + 1 < len(SLAB_CONFIG) else None
     )
     NEXT_SLAB_THRESHOLD[_cfg["slab"]] = (
         SLAB_CONFIG[_i + 1]["lower"] if _i + 1 < len(SLAB_CONFIG) else None
+    )
+    NEXT_SLAB_VOLUME[_cfg["slab"]] = (
+        SLAB_CONFIG[_i + 1]["volume_mt"] if _i + 1 < len(SLAB_CONFIG) else None
     )
 
 # ---------------------------------------------------------------------------
@@ -401,17 +407,26 @@ def generate_report(df: pd.DataFrame) -> Path:
         "Shop Volume": "Qual. Shop Vol.",
         "Site Volume": "Qual. Site Vol.",
         "Next Upgrade Slab": "Next Slab",
-        "Points to Next Slab": "Volume to Qualify",
     }
     display_headers = [header_rename.get(c, c) for c in detail_cols]
+    # Replace Points to Next Slab with Vol. to Achieve
+    if "Points to Next Slab" in display_headers:
+        display_headers[display_headers.index("Points to Next Slab")] = "Vol. to Achieve"
     ws_detail.append(display_headers)
 
     for _, row in df[detail_cols].iterrows():
         values = []
         for col, val in zip(detail_cols, row.values):
-            if col in ("Shop Volume", "Site Volume", "Total Volume",
-                       "Points to Next Slab", "Qualified Points"):
-                values.append(round(float(val if pd.notna(val) else 0), 1))
+            if col == "Points to Next Slab":
+                # Compute Vol. to Achieve from volume thresholds instead
+                slab = row.get("Qualified Slab", "Unqualified")
+                total_vol = float(row.get("Total Volume", 0) if pd.notna(row.get("Total Volume", 0)) else 0)
+                next_vol = NEXT_SLAB_VOLUME.get(slab)
+                vol_to_achieve = max(next_vol - total_vol, 0) if next_vol is not None else 0
+                values.append(int(round(vol_to_achieve)))
+            elif col in ("Shop Volume", "Site Volume", "Total Volume",
+                         "Qualified Points"):
+                values.append(int(round(float(val if pd.notna(val) else 0))))
             elif col == "Next Upgrade Slab":
                 values.append(str(val) if pd.notna(val) else "-")
             else:

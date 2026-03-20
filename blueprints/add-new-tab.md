@@ -51,7 +51,12 @@ The DataFrame includes these standard columns (mapped from Excel):
 - `Shop Volume` (Qual. Shop Vol.), `Site Volume` (Qual. Site Vol.)
 - `Total Volume`, `Qualified Volume`
 - `Qualified Points`, `Qualified Slab`, `Q4 Volume`
-- `Next Upgrade Slab` (Next Slab), `Points to Next Slab` (Volume to Qualify)
+- `Next Upgrade Slab` (Next Slab)
+- Vol. to Achieve is computed at display time from `NEXT_SLAB_VOLUME`
+
+**Note:** Global cascading filters (Slab, Zone, State, District, Distributor)
+are applied before tabs. New tab renderers receive the pre-filtered DataFrame.
+Use a unique `key` prefix only for any additional tab-specific filters.
 
 ### 5. Test
 - Verify filters cascade correctly
