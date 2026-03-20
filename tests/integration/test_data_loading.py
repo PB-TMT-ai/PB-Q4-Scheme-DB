@@ -94,5 +94,8 @@ class TestDataLoading:
         df = load_data()
         output_path = generate_report(df)
         wb = load_workbook(str(output_path))
-        expected = {"Slab Summary", "Dealer Detail", "Near-Upgrade", "Distributor Performance", "Zone Analysis"}
+        expected = {
+            "Slab Summary", "Dealer Detail", "Near-Upgrade",
+            "Zone Performance", "State Performance", "Distributor Performance",
+        }
         assert expected == set(wb.sheetnames)

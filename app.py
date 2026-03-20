@@ -1128,24 +1128,23 @@ def render_near_upgrade(df: pd.DataFrame) -> None:
 
 
 # ============================================================================
-# SECTION 9 — TAB: DISTRIBUTOR PERFORMANCE
+# SECTION 9 — TAB: PERFORMANCE OVERVIEW (Distributor / Zone / State)
 # ============================================================================
 
-def render_distributor_performance(df: pd.DataFrame) -> None:
-    """Render the Distributor Performance tab with aggregated distributor metrics.
-
-    Shows dealer count, total volume, avg points, and slab distribution
-    per distributor. Highlights top and bottom performers.
+def _build_performance_table(
+    df: pd.DataFrame,
+    group_col: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Aggregate dealer metrics by a grouping column with slab distribution.
 
     Args:
-        df: Filtered DataFrame.
-    """
-    if df.empty or "Distributor Name" not in df.columns:
-        st.info("No data available for distributor analysis.")
-        return
+        df: Source DataFrame.
+        group_col: Column to group by (e.g. "Distributor Name", "Zone", "State").
 
-    # --- Aggregate by distributor ---
-    dist_agg = df.groupby("Distributor Name", as_index=False).agg(
+    Returns:
+        Tuple of (aggregated DataFrame with Qual. Rate %, slab_mix DataFrame).
+    """
+    agg = df.groupby(group_col, as_index=False).agg(
         Dealers=("Dealer Name", "count"),
         Total_Volume=("Total Volume", "sum"),
         Avg_Points=("Qualified Points", "mean"),
@@ -1153,74 +1152,54 @@ def render_distributor_performance(df: pd.DataFrame) -> None:
         Shop_Volume=("Shop Volume", "sum"),
         Site_Volume=("Site Volume", "sum"),
     )
-    dist_agg = dist_agg[dist_agg["Distributor Name"].str.strip() != ""]
-    dist_agg = dist_agg.sort_values("Dealers", ascending=False)
+    agg = agg[agg[group_col].str.strip() != ""]
+    agg = agg.sort_values("Dealers", ascending=False)
 
-    total_distributors = len(dist_agg)
-
-    # --- Slab mix per distributor ---
-    slab_mix = (
-        df.groupby(["Distributor Name", "Qualified Slab"])
-        .size()
-        .unstack(fill_value=0)
-    )
-    # Ensure all slabs are present as columns
+    # Slab mix
+    valid = df[df[group_col].str.strip() != ""]
+    slab_mix = valid.groupby([group_col, "Qualified Slab"]).size().unstack(fill_value=0)
     for slab_name in SLAB_ORDER:
         if slab_name not in slab_mix.columns:
             slab_mix[slab_name] = 0
     slab_mix = slab_mix[SLAB_ORDER]
 
-    # Qualified rate = dealers NOT in "Unqualified" / total
     if "Unqualified" in slab_mix.columns:
         slab_mix["Qualified Rate"] = (
-            (slab_mix.drop(columns=["Unqualified"]).sum(axis=1))
+            slab_mix.drop(columns=["Unqualified"]).sum(axis=1)
             / slab_mix.sum(axis=1)
             * 100
         )
     else:
         slab_mix["Qualified Rate"] = 100.0
 
-    dist_agg = dist_agg.merge(
+    agg = agg.merge(
         slab_mix[["Qualified Rate"]],
-        left_on="Distributor Name",
+        left_on=group_col,
         right_index=True,
         how="left",
     )
 
-    # --- KPI cards ---
-    st.markdown('<div class="section-title">Distributor Overview</div>',
-                unsafe_allow_html=True)
+    return agg, slab_mix
 
-    avg_dealers_per_dist = dist_agg["Dealers"].mean()
-    top_dist = dist_agg.iloc[0]["Distributor Name"] if len(dist_agg) > 0 else "-"
-    avg_qual_rate = dist_agg["Qualified Rate"].mean()
 
-    kpi_cols = st.columns(4)
-    kpis = [
-        ("Total Distributors", format_indian(total_distributors)),
-        ("Avg. Dealers / Distributor", format_indian(avg_dealers_per_dist, decimal=0)),
-        ("Avg. Qualification Rate", f"{avg_qual_rate:.0f}%"),
-        ("Top Distributor", top_dist[:25]),
-    ]
-    for col, (label, value) in zip(kpi_cols, kpis):
-        with col:
-            st.markdown(
-                f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{label}</div>
-                    <div class="kpi-value" style="font-size: 1.1rem;">{value}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+def _render_performance_section(
+    agg_df: pd.DataFrame,
+    slab_mix: pd.DataFrame,
+    group_col: str,
+    title: str,
+) -> None:
+    """Render a styled performance table for a given grouping.
 
-    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+    Args:
+        agg_df: Aggregated metrics DataFrame.
+        slab_mix: Slab distribution DataFrame.
+        group_col: Grouping column name.
+        title: Subheader title text.
+    """
+    total_rows = len(agg_df)
+    st.subheader(f"{title} ({total_rows})")
 
-    # --- Performance table ---
-    st.subheader(f"Distributor Performance ({total_distributors} distributors)")
-
-    # Build display dataframe
-    display_df = dist_agg.copy()
+    display_df = agg_df.copy()
     display_df = display_df.rename(columns={
         "Total_Volume": "Total Volume",
         "Avg_Points": "Avg Points",
@@ -1235,14 +1214,14 @@ def render_distributor_performance(df: pd.DataFrame) -> None:
         if slab_name in slab_mix.columns:
             display_df = display_df.merge(
                 slab_mix[[slab_name]],
-                left_on="Distributor Name",
+                left_on=group_col,
                 right_index=True,
                 how="left",
             )
 
     display_cols = [
         c for c in [
-            "Distributor Name", "Dealers", "Total Volume",
+            group_col, "Dealers", "Total Volume",
             "Qual. Shop Vol.", "Qual. Site Vol.",
             "Avg Points", "Total Points", "Qual. Rate %",
         ] + SLAB_ORDER
@@ -1250,165 +1229,7 @@ def render_distributor_performance(df: pd.DataFrame) -> None:
     ]
     display_df = display_df[display_cols]
 
-    # Round numerics
-    int_cols = ["Dealers", "Total Volume", "Qual. Shop Vol.", "Qual. Site Vol.",
-                "Total Points"] + SLAB_ORDER
-    for col in int_cols:
-        if col in display_df.columns:
-            display_df[col] = pd.to_numeric(
-                display_df[col], errors="coerce"
-            ).fillna(0).round(0).astype(int)
-
-    for col in ["Avg Points", "Qual. Rate %"]:
-        if col in display_df.columns:
-            display_df[col] = pd.to_numeric(
-                display_df[col], errors="coerce"
-            ).fillna(0).round(0).astype(int)
-
-    def _highlight_qual_rate(row: pd.Series) -> list[str]:
-        """Color rows by qualification rate."""
-        rate = row.get("Qual. Rate %", 0)
-        if rate >= 60:
-            return ["background-color: #d1fae5"] * len(row)
-        if rate >= 30:
-            return ["background-color: #fef3c7"] * len(row)
-        return ["background-color: #fee2e2"] * len(row)
-
-    def _bold_dist_cols(col: pd.Series) -> list[str]:
-        """Bold key columns."""
-        if col.name in ("Distributor Name", "Dealers", "Qual. Rate %"):
-            return ["font-weight: 700"] * len(col)
-        return [""] * len(col)
-
-    styled = (
-        display_df.style
-        .apply(_highlight_qual_rate, axis=1)
-        .apply(_bold_dist_cols, axis=0)
-    )
-    st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
-
-
-# ============================================================================
-# SECTION 10 — TAB: ZONE-WISE ANALYSIS
-# ============================================================================
-
-def render_zone_analysis(df: pd.DataFrame) -> None:
-    """Render the Zone-wise Analysis tab with aggregated zone metrics.
-
-    Shows dealer count, volumes, avg/total points, qualification rate,
-    and slab distribution per zone.
-
-    Args:
-        df: Filtered DataFrame.
-    """
-    if df.empty or "Zone" not in df.columns:
-        st.info("No data available for zone analysis.")
-        return
-
-    # --- Aggregate by zone ---
-    zone_agg = df.groupby("Zone", as_index=False).agg(
-        Dealers=("Dealer Name", "count"),
-        Total_Volume=("Total Volume", "sum"),
-        Avg_Points=("Qualified Points", "mean"),
-        Total_Points=("Qualified Points", "sum"),
-        Shop_Volume=("Shop Volume", "sum"),
-        Site_Volume=("Site Volume", "sum"),
-    )
-    zone_agg = zone_agg[zone_agg["Zone"].str.strip() != ""]
-    zone_agg = zone_agg.sort_values("Dealers", ascending=False)
-
-    total_zones = len(zone_agg)
-
-    # Slab mix per zone
-    slab_mix = (
-        df[df["Zone"].str.strip() != ""]
-        .groupby(["Zone", "Qualified Slab"])
-        .size()
-        .unstack(fill_value=0)
-    )
-    for slab_name in SLAB_ORDER:
-        if slab_name not in slab_mix.columns:
-            slab_mix[slab_name] = 0
-    slab_mix = slab_mix[SLAB_ORDER]
-
-    if "Unqualified" in slab_mix.columns:
-        slab_mix["Qualified Rate"] = (
-            (slab_mix.drop(columns=["Unqualified"]).sum(axis=1))
-            / slab_mix.sum(axis=1)
-            * 100
-        )
-    else:
-        slab_mix["Qualified Rate"] = 100.0
-
-    zone_agg = zone_agg.merge(
-        slab_mix[["Qualified Rate"]],
-        left_on="Zone",
-        right_index=True,
-        how="left",
-    )
-
-    # --- KPI cards ---
-    st.markdown('<div class="section-title">Zone Overview</div>',
-                unsafe_allow_html=True)
-
-    top_zone = zone_agg.iloc[0]["Zone"] if len(zone_agg) > 0 else "-"
-    avg_qual_rate = zone_agg["Qualified Rate"].mean()
-
-    kpi_cols = st.columns(4)
-    kpis = [
-        ("Total Zones", format_indian(total_zones)),
-        ("Top Zone (by dealers)", top_zone),
-        ("Avg. Qualification Rate", f"{avg_qual_rate:.0f}%"),
-        ("Total Dealers", format_indian(zone_agg["Dealers"].sum())),
-    ]
-    for col, (label, value) in zip(kpi_cols, kpis):
-        with col:
-            st.markdown(
-                f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{label}</div>
-                    <div class="kpi-value" style="font-size: 1.1rem;">{value}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
-
-    # --- Zone table ---
-    st.subheader(f"Zone-wise Breakdown ({total_zones} zones)")
-
-    display_df = zone_agg.copy()
-    display_df = display_df.rename(columns={
-        "Total_Volume": "Total Volume",
-        "Avg_Points": "Avg Points",
-        "Total_Points": "Total Points",
-        "Shop_Volume": "Qual. Shop Vol.",
-        "Site_Volume": "Qual. Site Vol.",
-        "Qualified Rate": "Qual. Rate %",
-    })
-
-    # Add slab distribution columns
-    for slab_name in SLAB_ORDER:
-        if slab_name in slab_mix.columns:
-            display_df = display_df.merge(
-                slab_mix[[slab_name]],
-                left_on="Zone",
-                right_index=True,
-                how="left",
-            )
-
-    display_cols = [
-        c for c in [
-            "Zone", "Dealers", "Total Volume",
-            "Qual. Shop Vol.", "Qual. Site Vol.",
-            "Avg Points", "Total Points", "Qual. Rate %",
-        ] + SLAB_ORDER
-        if c in display_df.columns
-    ]
-    display_df = display_df[display_cols]
-
-    # Round all numerics to whole numbers
+    # All numerics to whole numbers
     int_cols = ["Dealers", "Total Volume", "Qual. Shop Vol.", "Qual. Site Vol.",
                 "Total Points", "Avg Points", "Qual. Rate %"] + SLAB_ORDER
     for col in int_cols:
@@ -1417,8 +1238,7 @@ def render_zone_analysis(df: pd.DataFrame) -> None:
                 display_df[col], errors="coerce"
             ).fillna(0).round(0).astype(int)
 
-    def _highlight_zone_qual(row: pd.Series) -> list[str]:
-        """Color rows by qualification rate."""
+    def _highlight_qual(row: pd.Series) -> list[str]:
         rate = row.get("Qual. Rate %", 0)
         if rate >= 60:
             return ["background-color: #d1fae5"] * len(row)
@@ -1426,22 +1246,79 @@ def render_zone_analysis(df: pd.DataFrame) -> None:
             return ["background-color: #fef3c7"] * len(row)
         return ["background-color: #fee2e2"] * len(row)
 
-    def _bold_zone_cols(col: pd.Series) -> list[str]:
-        """Bold key columns."""
-        if col.name in ("Zone", "Dealers", "Qual. Rate %"):
-            return ["font-weight: 700"] * len(col)
-        return [""] * len(col)
+    def _bold_key(col_series: pd.Series) -> list[str]:
+        if col_series.name in (group_col, "Dealers", "Qual. Rate %"):
+            return ["font-weight: 700"] * len(col_series)
+        return [""] * len(col_series)
 
     styled = (
         display_df.style
-        .apply(_highlight_zone_qual, axis=1)
-        .apply(_bold_zone_cols, axis=0)
+        .apply(_highlight_qual, axis=1)
+        .apply(_bold_key, axis=0)
     )
     st.dataframe(styled, use_container_width=True, hide_index=True, height=400)
 
 
+def render_performance_overview(df: pd.DataFrame) -> None:
+    """Render the Performance Overview tab with Distributor, Zone, and State tables.
+
+    Args:
+        df: Filtered DataFrame.
+    """
+    if df.empty:
+        st.info("No data available for performance analysis.")
+        return
+
+    # --- KPI cards ---
+    st.markdown('<div class="section-title">Performance Overview</div>',
+                unsafe_allow_html=True)
+
+    dist_count = df["Distributor Name"].nunique() if "Distributor Name" in df.columns else 0
+    zone_count = df["Zone"][df["Zone"].str.strip() != ""].nunique() if "Zone" in df.columns else 0
+    state_count = df["State"][df["State"].str.strip() != ""].nunique() if "State" in df.columns else 0
+    total_dealers = len(df)
+
+    kpi_cols = st.columns(4)
+    kpis = [
+        ("Total Dealers", format_indian(total_dealers)),
+        ("Distributors", format_indian(dist_count)),
+        ("Zones", format_indian(zone_count)),
+        ("States", format_indian(state_count)),
+    ]
+    for col, (label, value) in zip(kpi_cols, kpis):
+        with col:
+            st.markdown(
+                f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- Zone-wise table ---
+    if "Zone" in df.columns:
+        zone_agg, zone_slab = _build_performance_table(df, "Zone")
+        _render_performance_section(zone_agg, zone_slab, "Zone", "Zone-wise Performance")
+        st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- State-wise table ---
+    if "State" in df.columns:
+        state_agg, state_slab = _build_performance_table(df, "State")
+        _render_performance_section(state_agg, state_slab, "State", "State-wise Performance")
+        st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- Distributor-wise table ---
+    if "Distributor Name" in df.columns:
+        dist_agg, dist_slab = _build_performance_table(df, "Distributor Name")
+        _render_performance_section(dist_agg, dist_slab, "Distributor Name", "Distributor-wise Performance")
+
+
 # ============================================================================
-# SECTION 11 — MAIN
+# SECTION 10 — MAIN
 # ============================================================================
 
 def main() -> None:
@@ -1488,12 +1365,11 @@ def main() -> None:
     render_summary_top(filtered_df)
 
     # --- Tabs ---
-    tab_summary, tab_details, tab_upgrade, tab_distributor, tab_zone = st.tabs([
+    tab_summary, tab_details, tab_upgrade, tab_performance = st.tabs([
         "📊 Summary",
         "🔍 Dealer Details",
         "🎯 Near-Upgrade",
-        "🏢 Distributor Performance",
-        "🗺 Zone Analysis",
+        "📈 Performance Overview",
     ])
 
     with tab_summary:
@@ -1505,11 +1381,8 @@ def main() -> None:
     with tab_upgrade:
         render_near_upgrade(filtered_df)
 
-    with tab_distributor:
-        render_distributor_performance(filtered_df)
-
-    with tab_zone:
-        render_zone_analysis(filtered_df)
+    with tab_performance:
+        render_performance_overview(filtered_df)
 
 
 if __name__ == "__main__":

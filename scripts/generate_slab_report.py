@@ -475,126 +475,78 @@ def generate_report(df: pd.DataFrame) -> Path:
     _auto_width(ws_upgrade)
     ws_upgrade.freeze_panes = "A2"
 
-    # --- Sheet 4: Distributor Performance ---
-    ws_dist = wb.create_sheet("Distributor Performance")
-    ws_dist.sheet_properties.tabColor = "6366F1"
+    # --- Helper: write a grouped performance sheet ---
+    def _write_perf_sheet(
+        sheet_name: str,
+        tab_color: str,
+        group_col: str,
+    ) -> None:
+        """Write a performance sheet grouped by the given column."""
+        ws = wb.create_sheet(sheet_name)
+        ws.sheet_properties.tabColor = tab_color
 
-    dist_headers = [
-        "Distributor Name", "Dealers", "Total Volume",
-        "Qual. Shop Vol.", "Qual. Site Vol.",
-        "Avg Points", "Total Points", "Qual. Rate %",
-    ] + SLAB_ORDER
-    ws_dist.append(dist_headers)
+        perf_headers = [
+            group_col, "Dealers", "Total Volume",
+            "Qual. Shop Vol.", "Qual. Site Vol.",
+            "Avg Points", "Total Points", "Qual. Rate %",
+        ] + SLAB_ORDER
+        ws.append(perf_headers)
 
-    dist_agg = df.groupby("Distributor Name").agg(
-        Dealers=("Dealer Name", "count"),
-        Total_Volume=("Total Volume", "sum"),
-        Avg_Points=("Qualified Points", "mean"),
-        Total_Points=("Qualified Points", "sum"),
-        Shop_Volume=("Shop Volume", "sum"),
-        Site_Volume=("Site Volume", "sum"),
-    )
-    dist_agg = dist_agg[dist_agg.index.str.strip() != ""]
-    dist_agg = dist_agg.sort_values("Dealers", ascending=False)
-
-    slab_mix = df.groupby(["Distributor Name", "Qualified Slab"]).size().unstack(fill_value=0)
-    for slab_name in SLAB_ORDER:
-        if slab_name not in slab_mix.columns:
-            slab_mix[slab_name] = 0
-    slab_mix = slab_mix[SLAB_ORDER]
-
-    if "Unqualified" in slab_mix.columns:
-        slab_mix["Qualified Rate"] = (
-            slab_mix.drop(columns=["Unqualified"]).sum(axis=1)
-            / slab_mix.sum(axis=1) * 100
+        valid = df[df[group_col].str.strip() != ""]
+        agg = valid.groupby(group_col).agg(
+            Dealers=("Dealer Name", "count"),
+            Total_Volume=("Total Volume", "sum"),
+            Avg_Points=("Qualified Points", "mean"),
+            Total_Points=("Qualified Points", "sum"),
+            Shop_Volume=("Shop Volume", "sum"),
+            Site_Volume=("Site Volume", "sum"),
         )
-    else:
-        slab_mix["Qualified Rate"] = 100.0
+        agg = agg.sort_values("Dealers", ascending=False)
 
-    for dist_name in dist_agg.index:
-        row_data = dist_agg.loc[dist_name]
-        qual_rate = slab_mix.loc[dist_name, "Qualified Rate"] if dist_name in slab_mix.index else 0
-        slab_counts = [
-            int(slab_mix.loc[dist_name, s]) if dist_name in slab_mix.index else 0
-            for s in SLAB_ORDER
-        ]
-        ws_dist.append([
-            dist_name,
-            int(row_data["Dealers"]),
-            int(round(float(row_data["Total_Volume"]))),
-            int(round(float(row_data["Shop_Volume"]))),
-            int(round(float(row_data["Site_Volume"]))),
-            int(round(float(row_data["Avg_Points"]))),
-            int(round(float(row_data["Total_Points"]))),
-            int(round(float(qual_rate))),
-        ] + slab_counts)
+        smix = valid.groupby([group_col, "Qualified Slab"]).size().unstack(fill_value=0)
+        for slab_name in SLAB_ORDER:
+            if slab_name not in smix.columns:
+                smix[slab_name] = 0
+        smix = smix[SLAB_ORDER]
 
-    _style_header_row(ws_dist, len(dist_headers))
-    _auto_width(ws_dist)
-    ws_dist.freeze_panes = "A2"
+        if "Unqualified" in smix.columns:
+            smix["Qualified Rate"] = (
+                smix.drop(columns=["Unqualified"]).sum(axis=1)
+                / smix.sum(axis=1) * 100
+            )
+        else:
+            smix["Qualified Rate"] = 100.0
 
-    # --- Sheet 5: Zone Analysis ---
-    ws_zone = wb.create_sheet("Zone Analysis")
-    ws_zone.sheet_properties.tabColor = "10B981"
+        for name in agg.index:
+            row_data = agg.loc[name]
+            qual_rate = smix.loc[name, "Qualified Rate"] if name in smix.index else 0
+            slab_counts = [
+                int(smix.loc[name, s]) if name in smix.index else 0
+                for s in SLAB_ORDER
+            ]
+            ws.append([
+                name,
+                int(row_data["Dealers"]),
+                int(round(float(row_data["Total_Volume"]))),
+                int(round(float(row_data["Shop_Volume"]))),
+                int(round(float(row_data["Site_Volume"]))),
+                int(round(float(row_data["Avg_Points"]))),
+                int(round(float(row_data["Total_Points"]))),
+                int(round(float(qual_rate))),
+            ] + slab_counts)
 
-    zone_headers = [
-        "Zone", "Dealers", "Total Volume",
-        "Qual. Shop Vol.", "Qual. Site Vol.",
-        "Avg Points", "Total Points", "Qual. Rate %",
-    ] + SLAB_ORDER
-    ws_zone.append(zone_headers)
+        _style_header_row(ws, len(perf_headers))
+        _auto_width(ws)
+        ws.freeze_panes = "A2"
 
-    zone_agg = df.groupby("Zone").agg(
-        Dealers=("Dealer Name", "count"),
-        Total_Volume=("Total Volume", "sum"),
-        Avg_Points=("Qualified Points", "mean"),
-        Total_Points=("Qualified Points", "sum"),
-        Shop_Volume=("Shop Volume", "sum"),
-        Site_Volume=("Site Volume", "sum"),
-    )
-    zone_agg = zone_agg[zone_agg.index.str.strip() != ""]
-    zone_agg = zone_agg.sort_values("Dealers", ascending=False)
+    # --- Sheet 4: Zone Performance ---
+    _write_perf_sheet("Zone Performance", "10B981", "Zone")
 
-    zone_slab_mix = (
-        df[df["Zone"].str.strip() != ""]
-        .groupby(["Zone", "Qualified Slab"])
-        .size()
-        .unstack(fill_value=0)
-    )
-    for slab_name in SLAB_ORDER:
-        if slab_name not in zone_slab_mix.columns:
-            zone_slab_mix[slab_name] = 0
-    zone_slab_mix = zone_slab_mix[SLAB_ORDER]
+    # --- Sheet 5: State Performance ---
+    _write_perf_sheet("State Performance", "3B82F6", "State")
 
-    if "Unqualified" in zone_slab_mix.columns:
-        zone_slab_mix["Qualified Rate"] = (
-            zone_slab_mix.drop(columns=["Unqualified"]).sum(axis=1)
-            / zone_slab_mix.sum(axis=1) * 100
-        )
-    else:
-        zone_slab_mix["Qualified Rate"] = 100.0
-
-    for zone_name in zone_agg.index:
-        row_data = zone_agg.loc[zone_name]
-        qual_rate = zone_slab_mix.loc[zone_name, "Qualified Rate"] if zone_name in zone_slab_mix.index else 0
-        slab_counts = [
-            int(zone_slab_mix.loc[zone_name, s]) if zone_name in zone_slab_mix.index else 0
-            for s in SLAB_ORDER
-        ]
-        ws_zone.append([
-            zone_name,
-            int(row_data["Dealers"]),
-            int(round(float(row_data["Total_Volume"]))),
-            int(round(float(row_data["Shop_Volume"]))),
-            int(round(float(row_data["Site_Volume"]))),
-            int(round(float(row_data["Avg_Points"]))),
-            int(round(float(row_data["Total_Points"]))),
-            int(round(float(qual_rate))),
-        ] + slab_counts)
-
-    _style_header_row(ws_zone, len(zone_headers))
-    _auto_width(ws_zone)
-    ws_zone.freeze_panes = "A2"
+    # --- Sheet 6: Distributor Performance ---
+    _write_perf_sheet("Distributor Performance", "6366F1", "Distributor Name")
 
     # Save
     wb.save(str(output_path))
