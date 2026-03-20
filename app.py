@@ -307,75 +307,80 @@ def inject_custom_css() -> None:
             color: #ffffff;
         }
         .header-bar span {
-            font-size: 0.85rem;
-            color: #94a3b8;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #cbd5e1;
         }
 
         /* Slab cards */
         .slab-card {
-            background: linear-gradient(135deg, #f0f7ff, #e8f2ff);
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(59,130,246,0.10);
-            padding: 1rem 1.2rem;
-            border-left: 4px solid #bfdbfe;
+            background: #ffffff;
+            border-radius: 0.6rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            padding: 1.1rem 1.3rem;
+            border-left: 5px solid #bfdbfe;
             margin-bottom: 0.5rem;
         }
         .slab-count {
-            font-size: 1.7rem;
-            font-weight: 700;
-            color: #1e40af;
+            font-size: 2rem;
+            font-weight: 800;
+            color: #0f172a;
             line-height: 1.2;
         }
         .slab-label {
-            font-size: 0.78rem;
+            font-size: 0.85rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #3b82f6;
-            margin-top: 0.25rem;
+            color: #1e293b;
+            margin-top: 0.3rem;
         }
         .slab-gift {
-            font-size: 0.72rem;
-            color: #93c5fd;
-            margin-top: 0.15rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: #475569;
+            margin-top: 0.2rem;
         }
 
         /* KPI cards */
         .kpi-card {
-            background: linear-gradient(135deg, #f8fbff, #eff6ff);
-            border: 1px solid #dbeafe;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(59,130,246,0.08);
-            padding: 1rem;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.6rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+            padding: 1.1rem;
             text-align: center;
         }
         .kpi-label {
-            font-size: 0.78rem;
+            font-size: 0.82rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #3b82f6;
-            margin-bottom: 0.25rem;
+            color: #334155;
+            margin-bottom: 0.3rem;
         }
         .kpi-value {
-            font-size: 1.35rem;
-            font-weight: 700;
-            color: #1e3a5f;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0f172a;
         }
 
         /* Total row styling for tables */
         .total-row {
-            font-weight: 700;
-            background-color: #eff6ff;
+            font-weight: 800;
+            background-color: #e2e8f0;
         }
 
-        /* Light blue table styling */
+        /* Table styling */
         .stDataFrame [data-testid="stDataFrameResizable"] {
-            border: 1px solid #bfdbfe;
+            border: 1px solid #94a3b8;
             border-radius: 0.5rem;
         }
         .stDataFrame thead tr th {
-            background-color: #dbeafe !important;
-            color: #1e3a5f !important;
+            background-color: #1e293b !important;
+            color: #ffffff !important;
             font-weight: 800 !important;
+            font-size: 0.85rem !important;
         }
         /* Bold headers in Streamlit dataframe (glide-data-grid) */
         [data-testid="stDataFrame"] [role="columnheader"],
@@ -386,13 +391,13 @@ def inject_custom_css() -> None:
             font-weight: 800 !important;
         }
         .stDataFrame tbody tr:nth-child(even) {
-            background-color: #eff6ff !important;
+            background-color: #f1f5f9 !important;
         }
         .stDataFrame tbody tr:nth-child(odd) {
-            background-color: #f8fbff !important;
+            background-color: #ffffff !important;
         }
         .stDataFrame tbody tr:hover {
-            background-color: #dbeafe !important;
+            background-color: #e2e8f0 !important;
         }
 
         /* Hide Streamlit chrome */
@@ -403,10 +408,34 @@ def inject_custom_css() -> None:
         /* Streamlit tab styling */
         .stTabs [data-baseweb="tab-list"] {
             gap: 0.5rem;
+            border-bottom: 2px solid #cbd5e1;
         }
         .stTabs [data-baseweb="tab"] {
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
+            padding: 0.6rem 1.2rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #334155;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            font-weight: 700;
+            color: #0f172a;
+            border-bottom: 3px solid #2563eb;
+        }
+
+        /* Filter dropdowns */
+        .stSelectbox label {
+            font-weight: 600 !important;
+            color: #1e293b !important;
+            font-size: 0.85rem !important;
+        }
+        .stSelectbox [data-baseweb="select"] {
+            border-color: #94a3b8 !important;
+        }
+
+        /* Subheaders */
+        .stSubheader, h3, h2 {
+            color: #0f172a !important;
+            font-weight: 700 !important;
         }
         </style>
         """,
@@ -701,7 +730,7 @@ def render_summary(df: pd.DataFrame) -> None:
         """Apply slab color and bold formatting to summary rows."""
         slab = row.get("Slab", "")
         if slab == "TOTAL":
-            return ["font-weight: 700; background-color: #e2e8f0"] * len(row)
+            return ["font-weight: 800; background-color: #cbd5e1; color: #0f172a"] * len(row)
         bg = SLAB_COLORS_LIGHT.get(slab, "")
         if bg:
             return [f"background-color: {bg}"] * len(row)
