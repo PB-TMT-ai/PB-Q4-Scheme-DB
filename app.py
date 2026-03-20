@@ -709,6 +709,9 @@ def render_summary(df: pd.DataFrame) -> None:
         summary_df.style
         .apply(_style_summary_row, axis=1)
         .apply(_bold_summary_columns, axis=0)
+        .set_table_styles([
+            {"selector": "th", "props": [("font-weight", "700")]},
+        ])
     )
     st.dataframe(styled, use_container_width=True, hide_index=True)
 
@@ -835,6 +838,9 @@ def render_dealer_details(df: pd.DataFrame) -> None:
         display_df.style
         .apply(_highlight_by_slab, axis=1)
         .apply(_bold_key_columns, axis=0)
+        .set_table_styles([
+            {"selector": "th", "props": [("font-weight", "700")]},
+        ])
     )
     st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
 
