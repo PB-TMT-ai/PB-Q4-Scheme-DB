@@ -84,6 +84,7 @@ SLAB_CONFIG: list[dict] = [
         "gift_full": "No Gift",
         "category": "Unqualified",
         "color": "#94a3b8",
+        "color_light": "#f1f5f9",
     },
     {
         "slab": "Slab A",
@@ -95,6 +96,7 @@ SLAB_CONFIG: list[dict] = [
         "gift_full": "Foot massager",
         "category": "A",
         "color": "#f59e0b",
+        "color_light": "#fef3c7",
     },
     {
         "slab": "Slab B",
@@ -106,6 +108,7 @@ SLAB_CONFIG: list[dict] = [
         "gift_full": "Sony - Sound bar, woofer and speakers",
         "category": "B",
         "color": "#6366f1",
+        "color_light": "#e0e7ff",
     },
     {
         "slab": "Slab C",
@@ -117,6 +120,7 @@ SLAB_CONFIG: list[dict] = [
         "gift_full": "Robot Vacuum cleaner",
         "category": "C",
         "color": "#10b981",
+        "color_light": "#d1fae5",
     },
     {
         "slab": "Slab D",
@@ -128,6 +132,7 @@ SLAB_CONFIG: list[dict] = [
         "gift_full": "Apple iPad",
         "category": "D",
         "color": "#3b82f6",
+        "color_light": "#dbeafe",
     },
     {
         "slab": "Slab E",
@@ -139,12 +144,14 @@ SLAB_CONFIG: list[dict] = [
         "gift_full": "Samsung front-load washing machine",
         "category": "E",
         "color": "#ec4899",
+        "color_light": "#fce7f3",
     },
 ]
 
 # Derived lookup dictionaries — all computed from SLAB_CONFIG
 SLAB_GIFT_MAP: dict[str, str] = {s["slab"]: s["gift_full"] for s in SLAB_CONFIG}
 SLAB_COLORS: dict[str, str] = {s["slab"]: s["color"] for s in SLAB_CONFIG}
+SLAB_COLORS_LIGHT: dict[str, str] = {s["slab"]: s["color_light"] for s in SLAB_CONFIG}
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
 
 # Map Excel slab codes (A, B, C, ...) to full slab names
@@ -564,15 +571,17 @@ def render_summary_top(df: pd.DataFrame) -> None:
     site_qual_vol = df["Site Volume"].sum() if "Site Volume" in df.columns else 0
     total_points = df["Qualified Points"].sum() if "Qualified Points" in df.columns else 0
 
-    total_shop_vol = filtered["Shop Volume"].sum() if "Shop Volume" in filtered.columns else 0
-    total_site_vol = filtered["Site Volume"].sum() if "Site Volume" in filtered.columns else 0
+    total_shop_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
+    total_site_vol = df["Site Volume"].sum() if "Site Volume" in df.columns else 0
+    total_qual_vol = df["Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
 
-    kpi_cols = st.columns(5)
+    kpi_cols = st.columns(6)
     kpis = [
         ("Total Dealers", format_indian(total_dealers)),
         ("Total Volume (MT)", format_indian(total_volume, decimal=1)),
         ("Shop Qual. Volume (MT)", format_indian(total_shop_vol, decimal=1)),
         ("Site Qual. Volume (MT)", format_indian(total_site_vol, decimal=1)),
+        ("Qualified Volume (MT)", format_indian(total_qual_vol, decimal=1)),
         ("Total Qualified Points", format_indian(total_points, decimal=1)),
     ]
     for col, (label, value) in zip(kpi_cols, kpis):
@@ -612,7 +621,7 @@ def render_summary_top(df: pd.DataFrame) -> None:
 
 
 def render_summary(df: pd.DataFrame) -> None:
-    """Render the Summary tab with breakdown table and chart (no filters).
+    """Render the Summary tab with slab breakdown table (no filters).
 
     Args:
         df: Full DataFrame.
@@ -624,6 +633,7 @@ def render_summary(df: pd.DataFrame) -> None:
     grand_vol = 0.0
     grand_shop_vol = 0.0
     grand_site_vol = 0.0
+    grand_qual_vol = 0.0
     grand_pts = 0.0
 
     for cfg in SLAB_CONFIG:
@@ -632,11 +642,13 @@ def render_summary(df: pd.DataFrame) -> None:
         vol = slab_df["Total Volume"].sum() if "Total Volume" in slab_df.columns else 0
         shop_vol = slab_df["Shop Volume"].sum() if "Shop Volume" in slab_df.columns else 0
         site_vol = slab_df["Site Volume"].sum() if "Site Volume" in slab_df.columns else 0
+        qual_vol = slab_df["Qualified Volume"].sum() if "Qualified Volume" in slab_df.columns else 0
         pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
         grand_count += count
         grand_vol += vol
         grand_shop_vol += shop_vol
         grand_site_vol += site_vol
+        grand_qual_vol += qual_vol
         grand_pts += pts
         summary_rows.append({
             "Slab": cfg["slab"],
@@ -645,6 +657,7 @@ def render_summary(df: pd.DataFrame) -> None:
             "Total Volume": format_indian(vol, decimal=1),
             "Shop Qual. Volume": format_indian(shop_vol, decimal=1),
             "Site Qual. Volume": format_indian(site_vol, decimal=1),
+            "Qualified Volume": format_indian(qual_vol, decimal=1),
             "Total Points": format_indian(pts, decimal=1),
             "Gift": cfg["gift_full"],
         })
@@ -656,12 +669,35 @@ def render_summary(df: pd.DataFrame) -> None:
         "Total Volume": format_indian(grand_vol, decimal=1),
         "Shop Qual. Volume": format_indian(grand_shop_vol, decimal=1),
         "Site Qual. Volume": format_indian(grand_site_vol, decimal=1),
+        "Qualified Volume": format_indian(grand_qual_vol, decimal=1),
         "Total Points": format_indian(grand_pts, decimal=1),
         "Gift": "",
     })
 
     summary_df = pd.DataFrame(summary_rows)
-    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+
+    def _style_summary_row(row: pd.Series) -> list[str]:
+        """Apply slab color and bold formatting to summary rows."""
+        slab = row.get("Slab", "")
+        if slab == "TOTAL":
+            return ["font-weight: 700; background-color: #e2e8f0"] * len(row)
+        bg = SLAB_COLORS_LIGHT.get(slab, "")
+        if bg:
+            return [f"background-color: {bg}"] * len(row)
+        return [""] * len(row)
+
+    def _bold_summary_columns(col: pd.Series) -> list[str]:
+        """Bold key summary columns."""
+        if col.name in ("Slab", "Dealer Count", "Total Points"):
+            return ["font-weight: 700"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        summary_df.style
+        .apply(_style_summary_row, axis=1)
+        .apply(_bold_summary_columns, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True)
 
 
 # ============================================================================
@@ -673,7 +709,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
 
     Filters: Distributor Name, State, Dealer Name, Qualified Slab.
     Columns: Dealer Name, Distributor Name, State, Region/Zone,
-             Shop Volume, Site Volume, Total Volume, Qualified Volume,
+             Shop Volume, Site Volume, Qualified Volume, Total Volume,
              Qualified Slab, Qualified Points.
 
     Args:
@@ -690,7 +726,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     display_cols = [
         c for c in [
             "Dealer Name", "Distributor Name", "State", "Zone",
-            "Shop Volume", "Site Volume", "Total Volume",
+            "Shop Volume", "Site Volume", "Qualified Volume", "Total Volume",
             "Qualified Slab", "Qualified Points",
         ]
         if c in filtered.columns
@@ -700,20 +736,36 @@ def render_dealer_details(df: pd.DataFrame) -> None:
 
     # Round numeric columns to 1 decimal
     display_df = filtered[display_cols].copy()
-    num_cols = ["Shop Volume", "Site Volume", "Total Volume", "Qualified Points"]
+    num_cols = ["Shop Volume", "Site Volume", "Qualified Volume", "Total Volume", "Qualified Points"]
     for col in num_cols:
         if col in display_df.columns:
             display_df[col] = display_df[col].round(1)
 
-    def _highlight_total_row(row: pd.Series) -> list[str]:
-        """Apply bold grey background to total/summary rows."""
+    def _highlight_by_slab(row: pd.Series) -> list[str]:
+        """Apply light slab-based background color to each row."""
+        # Check for total/summary rows first
         for field in ["Dealer Name", "Distributor Name"]:
             val = row.get(field)
             if isinstance(val, str) and "total" in val.lower():
                 return ["font-weight: 700; background-color: #f1f5f9"] * len(row)
+
+        slab = row.get("Qualified Slab", "")
+        bg_color = SLAB_COLORS_LIGHT.get(slab, "")
+        if bg_color:
+            return [f"background-color: {bg_color}"] * len(row)
         return [""] * len(row)
 
-    styled = display_df.style.apply(_highlight_total_row, axis=1)
+    def _bold_key_columns(col: pd.Series) -> list[str]:
+        """Bold key columns: Dealer Name, Qualified Slab, Qualified Points."""
+        if col.name in ("Dealer Name", "Qualified Slab", "Qualified Points"):
+            return ["font-weight: 700"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        display_df.style
+        .apply(_highlight_by_slab, axis=1)
+        .apply(_bold_key_columns, axis=0)
+    )
     st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
 
 
