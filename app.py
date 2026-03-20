@@ -375,7 +375,15 @@ def inject_custom_css() -> None:
         .stDataFrame thead tr th {
             background-color: #dbeafe !important;
             color: #1e3a5f !important;
-            font-weight: 600;
+            font-weight: 800 !important;
+        }
+        /* Bold headers in Streamlit dataframe (glide-data-grid) */
+        [data-testid="stDataFrame"] [role="columnheader"],
+        [data-testid="stDataFrame"] [data-testid="glide-cell"] {
+            font-weight: 700 !important;
+        }
+        [data-testid="stDataFrame"] .gdg-header {
+            font-weight: 800 !important;
         }
         .stDataFrame tbody tr:nth-child(even) {
             background-color: #eff6ff !important;
@@ -709,9 +717,6 @@ def render_summary(df: pd.DataFrame) -> None:
         summary_df.style
         .apply(_style_summary_row, axis=1)
         .apply(_bold_summary_columns, axis=0)
-        .set_table_styles([
-            {"selector": "th", "props": [("font-weight", "700")]},
-        ])
     )
     st.dataframe(styled, use_container_width=True, hide_index=True)
 
@@ -838,9 +843,6 @@ def render_dealer_details(df: pd.DataFrame) -> None:
         display_df.style
         .apply(_highlight_by_slab, axis=1)
         .apply(_bold_key_columns, axis=0)
-        .set_table_styles([
-            {"selector": "th", "props": [("font-weight", "700")]},
-        ])
     )
     st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
 
