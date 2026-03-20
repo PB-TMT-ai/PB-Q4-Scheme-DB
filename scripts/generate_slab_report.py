@@ -1,8 +1,8 @@
 """
 Standalone Slab Report Generator
 ================================
-Generates a formatted Excel report with slab analysis.
-Outputs to .workspace/ directory.
+Generates a formatted Excel report with slab analysis based on
+qualified points. Outputs to .workspace/ directory.
 
 Usage:
     python scripts/generate_slab_report.py
@@ -44,44 +44,101 @@ MONTH_LABELS: list[str] = [
 ]
 
 SLAB_CONFIG: list[dict] = [
-    {"slab": "Slab 1", "range": "0 – 499", "lower": 0, "upper": 500,
+    {"slab": "Unqualified", "range": "0 – 749", "lower": 0, "upper": 750,
      "gift": "No Gift", "gift_full": "Below minimum qualification",
-     "category": "Unqualified", "value": 0, "value_tds": 0, "color": "#94a3b8"},
-    {"slab": "Slab 2", "range": "500 – 999", "lower": 500, "upper": 1000,
-     "gift": "Bronze Gift", "gift_full": "Bronze tier reward",
-     "category": "Bronze", "value": 5000, "value_tds": 4500, "color": "#f59e0b"},
-    {"slab": "Slab 3", "range": "1,000 – 2,499", "lower": 1000, "upper": 2500,
-     "gift": "Silver Gift", "gift_full": "Silver tier reward",
-     "category": "Silver", "value": 15000, "value_tds": 13500, "color": "#6366f1"},
-    {"slab": "Slab 4", "range": "2,500 – 4,999", "lower": 2500, "upper": 5000,
-     "gift": "Gold Gift", "gift_full": "Gold tier reward",
-     "category": "Gold", "value": 35000, "value_tds": 31500, "color": "#10b981"},
-    {"slab": "Slab 5", "range": "5,000+", "lower": 5000, "upper": float("inf"),
-     "gift": "Platinum Gift", "gift_full": "Platinum tier reward",
-     "category": "Platinum", "value": 75000, "value_tds": 67500, "color": "#3b82f6"},
+     "category": "Unqualified", "color": "#94a3b8"},
+    {"slab": "Slab A", "range": "750 – 2,999", "lower": 750, "upper": 3000,
+     "gift": "Foot Massager", "gift_full": "Foot massager",
+     "category": "A", "color": "#f59e0b"},
+    {"slab": "Slab B", "range": "3,000 – 4,199", "lower": 3000, "upper": 4200,
+     "gift": "Sony Sound Bar", "gift_full": "Sony - sound bar, woofer and speakers",
+     "category": "B", "color": "#6366f1"},
+    {"slab": "Slab C", "range": "4,200 – 6,799", "lower": 4200, "upper": 6800,
+     "gift": "Robot Vacuum", "gift_full": "Robot Vacuum cleaner",
+     "category": "C", "color": "#10b981"},
+    {"slab": "Slab D", "range": "6,800 – 7,499", "lower": 6800, "upper": 7500,
+     "gift": "Apple iPad", "gift_full": "Apple iPad",
+     "category": "D", "color": "#3b82f6"},
+    {"slab": "Slab E", "range": "7,500+", "lower": 7500, "upper": float("inf"),
+     "gift": "Washing Machine", "gift_full": "Samsung front-load washing machine",
+     "category": "E", "color": "#ec4899"},
 ]
 
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
+
+POINTS_CONFIG: dict = {
+    "min_volume_mt": 30,
+    "points_per_mt": 25,
+    "milestones": [
+        {"threshold": 200, "bonus_pct": 50},
+        {"threshold": 150, "bonus_pct": 30},
+        {"threshold": 100, "bonus_pct": 20},
+        {"threshold": 50, "bonus_pct": 10},
+    ],
+}
 
 # ---------------------------------------------------------------------------
 # HELPERS (mirrored from app.py)
 # ---------------------------------------------------------------------------
 
 
-def assign_slab(vol: float) -> str:
-    """Assign a slab label based on volume.
+def calculate_qualified_volume(shop_vol: float, site_vol: float) -> float:
+    """Calculate qualified volume from shop and site volumes.
 
     Args:
-        vol: The volume value to classify.
+        shop_vol: Total shop volume.
+        site_vol: Total site volume (pre-capped).
+
+    Returns:
+        Combined qualified volume.
+    """
+    shop = float(shop_vol) if not pd.isna(shop_vol) else 0.0
+    site = float(site_vol) if not pd.isna(site_vol) else 0.0
+    return shop + site
+
+
+def calculate_qualified_points(qualified_vol_mt: float) -> float:
+    """Calculate qualified points from qualified volume.
+
+    Args:
+        qualified_vol_mt: Qualified volume in MT.
+
+    Returns:
+        Calculated points (rounded to nearest integer).
+    """
+    if pd.isna(qualified_vol_mt):
+        qualified_vol_mt = 0.0
+    vol = float(qualified_vol_mt)
+
+    if vol < POINTS_CONFIG["min_volume_mt"]:
+        return 0.0
+
+    base_points = vol * POINTS_CONFIG["points_per_mt"]
+
+    bonus_pct = 0
+    for milestone in POINTS_CONFIG["milestones"]:
+        if vol >= milestone["threshold"]:
+            bonus_pct = milestone["bonus_pct"]
+            break
+
+    total = base_points * (1 + bonus_pct / 100)
+    return round(total)
+
+
+def assign_slab(points: float) -> str:
+    """Assign a slab label based on qualified points.
+
+    Args:
+        points: Qualified points value.
 
     Returns:
         Slab label string.
     """
-    if pd.isna(vol):
-        vol = 0.0
-    vol = float(vol)
+    if pd.isna(points):
+        points = 0.0
+    points = float(points)
     for cfg in SLAB_CONFIG:
-        if cfg["lower"] <= vol < cfg["upper"]:
+        if cfg["lower"] <= points < cfg["upper"]:
             return cfg["slab"]
     return SLAB_CONFIG[0]["slab"]
 
@@ -199,11 +256,24 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
+    # Total Volume
+    if month_cols and "Total Volume" not in df.columns:
+        df["Total Volume"] = df[month_cols].sum(axis=1)
+
+    # Shop / Site volumes
+    for vol_col in ["Shop Volume", "Site Volume"]:
+        if vol_col in df.columns:
+            df[vol_col] = pd.to_numeric(df[vol_col], errors="coerce").fillna(0.0)
+        else:
+            df[vol_col] = 0.0
+
     # Derived columns
-    if month_cols:
-        if "Total Volume" not in df.columns:
-            df["Total Volume"] = df[month_cols].sum(axis=1)
-        df["Qualified Slab"] = df["Total Volume"].apply(assign_slab)
+    df["Qualified Volume"] = df.apply(
+        lambda row: calculate_qualified_volume(row["Shop Volume"], row["Site Volume"]),
+        axis=1,
+    )
+    df["Qualified Points"] = df["Qualified Volume"].apply(calculate_qualified_points)
+    df["Qualified Slab"] = df["Qualified Points"].apply(assign_slab)
 
     log_info(f"Loaded {len(df)} rows")
     return df, month_cols
@@ -213,7 +283,6 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
 # EXCEL REPORT GENERATION
 # ---------------------------------------------------------------------------
 
-# Styles
 HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
 HEADER_FILL = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
 HEADER_ALIGNMENT = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -276,33 +345,33 @@ def generate_report(df: pd.DataFrame, month_cols: list[str]) -> Path:
     ws_summary.title = "Slab Summary"
     ws_summary.sheet_properties.tabColor = "1F4E79"
 
-    headers = ["Slab", "Range", "Count", "Total Volume", "Gift", "Value (post-TDS)"]
+    headers = ["Slab", "Points Range", "Dealer Count", "Total Volume",
+               "Qualified Volume", "Total Points", "Gift"]
     ws_summary.append(headers)
 
     for cfg in SLAB_CONFIG:
         slab_df = df[df["Qualified Slab"] == cfg["slab"]] if "Qualified Slab" in df.columns else pd.DataFrame()
         count = len(slab_df)
         vol = slab_df["Total Volume"].sum() if "Total Volume" in slab_df.columns else 0
+        qual = slab_df["Qualified Volume"].sum() if "Qualified Volume" in slab_df.columns else 0
+        pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
         ws_summary.append([
-            cfg["slab"],
-            cfg["range"],
-            count,
-            round(vol, 2),
-            cfg["gift_full"],
-            cfg["value_tds"] * count,
+            cfg["slab"], cfg["range"], count, round(vol, 1),
+            round(qual, 1), round(pts), cfg["gift_full"],
         ])
 
     _style_header_row(ws_summary, len(headers))
     _auto_width(ws_summary)
     ws_summary.freeze_panes = "A2"
 
-    # --- Sheet 2: Distributor Detail ---
-    ws_detail = wb.create_sheet("Distributor Detail")
+    # --- Sheet 2: Dealer Detail ---
+    ws_detail = wb.create_sheet("Dealer Detail")
     ws_detail.sheet_properties.tabColor = "10B981"
 
     detail_cols = [
-        c for c in ["Distributor Name", "State", "District", "Zone",
-                     "Total Volume", "Qualified Slab"] + month_cols
+        c for c in ["Dealer Name", "Distributor Name", "State", "Region",
+                     "Shop Volume", "Site Volume", "Total Volume",
+                     "Qualified Volume", "Qualified Slab", "Qualified Points"]
         if c in df.columns
     ]
 
