@@ -1,0 +1,42 @@
+# CLAUDE.md — Project Instructions
+
+## Project Overview
+Streamlit-based dashboard for scheme/slab analysis with Excel data ingestion,
+cascading filters, and Plotly visualizations.
+
+## Coding Standards
+- **Python 3.10+** with type hints on all function signatures
+- **Google-style docstrings** on all public functions
+- `snake_case` for functions/variables, `PascalCase` for classes
+- `f-strings` only — no `.format()` or `%` formatting
+- `pathlib.Path` over `os.path` everywhere
+- No bare `except` — catch specific exceptions (ValueError, FileNotFoundError, etc.)
+- `dataclasses` or Pydantic for data models if needed
+
+## Project Structure
+- `app.py` — Single-file Streamlit app, sectioned with numbered comments
+- `src/lib/logger.py` — Simple print-based logger (info/error)
+- `scripts/` — Standalone report generators (no Streamlit dependency)
+- `blueprints/` — Task SOPs in markdown
+- `tests/unit/` and `tests/integration/` — Test suites
+- `data/` — Source Excel files (.xlsx)
+- `.workspace/` — Temp output files (gitignored)
+
+## Key Patterns
+- **SLAB_CONFIG** is single source of truth for all tier definitions
+- All slab-derived dicts are computed from SLAB_CONFIG, never hardcoded separately
+- Cascading filters reuse `render_cascading_filters()` with unique key prefixes per tab
+- Indian number formatting (`format_indian`) for all displayed values
+- `@st.cache_data` on all data-loading functions
+
+## Error Protocol
+1. Log the error via `src/lib/logger.py`
+2. Show user-friendly message via `st.error()` or `st.warning()`
+3. Never let the app crash silently — always `st.stop()` on fatal errors
+4. Record resolution in LEARNINGS.md
+
+## CSS Design System
+- Card-based white UI with subtle shadows
+- Color-coded elements per slab via SLAB_COLORS dict
+- Typography: .kpi-label (small, uppercase, muted), .kpi-value (bold, dark)
+- Responsive layout via st.columns()
