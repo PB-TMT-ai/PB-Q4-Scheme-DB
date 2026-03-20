@@ -710,7 +710,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     Filters: Distributor Name, State, Dealer Name, Qualified Slab.
     Columns: Dealer Name, Distributor Name, State, Zone,
              Qual. Shop Vol., Qual. Site Vol., Total Volume,
-             Qualified Slab, Next Slab, Volume to Qualify, Qualified Points.
+             Qualified Slab, Next Slab, Qualified Points.
 
     Args:
         df: Full DataFrame.
@@ -727,7 +727,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
         c for c in [
             "Dealer Name", "Distributor Name", "State", "Zone",
             "Shop Volume", "Site Volume", "Total Volume",
-            "Qualified Slab", "Next Upgrade Slab", "Points to Next Slab",
+            "Qualified Slab", "Next Upgrade Slab",
             "Qualified Points",
         ]
         if c in filtered.columns
@@ -742,26 +742,22 @@ def render_dealer_details(df: pd.DataFrame) -> None:
         "Shop Volume": "Qual. Shop Vol.",
         "Site Volume": "Qual. Site Vol.",
         "Next Upgrade Slab": "Next Slab",
-        "Points to Next Slab": "Volume to Qualify",
     }
     display_df = display_df.rename(columns=rename_map)
 
     # Fill None values for Next Slab / Volume to Qualify (Slab E dealers)
     if "Next Slab" in display_df.columns:
         display_df["Next Slab"] = display_df["Next Slab"].fillna("-")
-    if "Volume to Qualify" in display_df.columns:
-        display_df["Volume to Qualify"] = pd.to_numeric(
-            display_df["Volume to Qualify"], errors="coerce"
-        ).fillna(0.0)
-
-    # Round all numeric columns to 1 decimal
+    # Round all numeric columns to whole numbers
     num_cols = [
         "Qual. Shop Vol.", "Qual. Site Vol.", "Total Volume",
-        "Volume to Qualify", "Qualified Points",
+        "Qualified Points",
     ]
     for col in num_cols:
         if col in display_df.columns:
-            display_df[col] = display_df[col].round(1)
+            display_df[col] = pd.to_numeric(
+                display_df[col], errors="coerce"
+            ).fillna(0).round(0).astype(int)
 
     def _highlight_by_slab(row: pd.Series) -> list[str]:
         """Apply light slab-based background color to each row."""
@@ -779,7 +775,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     def _bold_key_columns(col: pd.Series) -> list[str]:
         """Bold key columns: Dealer Name, Qualified Slab, Qualified Points."""
         if col.name in ("Dealer Name", "Qualified Slab", "Qualified Points",
-                         "Next Slab", "Volume to Qualify"):
+                         "Next Slab"):
             return ["font-weight: 700"] * len(col)
         return [""] * len(col)
 
