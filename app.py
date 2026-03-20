@@ -289,98 +289,190 @@ def inject_custom_css() -> None:
     st.markdown(
         """
         <style>
-        /* Header bar */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        /* Global page styling */
+        .stApp {
+            background-color: #f8fafc;
+        }
+        .block-container {
+            padding-top: 1rem !important;
+        }
+
+        /* ── Header bar ── */
         .header-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem 1rem;
-            background: linear-gradient(135deg, #1e293b, #334155);
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%);
+            border-radius: 0.75rem;
+            margin-bottom: 0.75rem;
             color: #ffffff;
+            box-shadow: 0 4px 12px rgba(15,23,42,0.25);
         }
         .header-bar h1 {
             margin: 0;
-            font-size: 1.4rem;
-            font-weight: 700;
+            font-size: 1.5rem;
+            font-weight: 800;
             color: #ffffff;
+            letter-spacing: -0.01em;
         }
-        .header-bar span {
-            font-size: 0.9rem;
+        .header-bar .header-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .header-bar .header-badge {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 2rem;
+            padding: 0.3rem 0.9rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            letter-spacing: 0.03em;
+        }
+        .header-bar .header-subtitle {
+            font-size: 0.85rem;
             font-weight: 500;
-            color: #cbd5e1;
+            color: #94a3b8;
         }
 
-        /* Slab cards */
+        /* ── Section divider ── */
+        .section-divider {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            margin: 0.5rem 0 1rem 0;
+        }
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+
+        /* ── Filter panel ── */
+        .filter-panel {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 0.9rem 1.2rem 0.5rem 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+        .filter-panel-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #64748b;
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* ── KPI cards ── */
+        .kpi-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-top: 3px solid #2563eb;
+            border-radius: 0.6rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 1rem 0.8rem;
+            text-align: center;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .kpi-card:hover {
+            box-shadow: 0 4px 16px rgba(37,99,235,0.12);
+            transform: translateY(-1px);
+        }
+        .kpi-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #64748b;
+            margin-bottom: 0.35rem;
+        }
+        .kpi-value {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+
+        /* ── Slab cards ── */
         .slab-card {
             background: #ffffff;
             border-radius: 0.6rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-            padding: 1.1rem 1.3rem;
-            border-left: 5px solid #bfdbfe;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 0;
             margin-bottom: 0.5rem;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .slab-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            transform: translateY(-1px);
+        }
+        .slab-color-band {
+            height: 5px;
+            width: 100%;
+        }
+        .slab-card-body {
+            padding: 0.9rem 1rem;
         }
         .slab-count {
             font-size: 2rem;
             font-weight: 800;
             color: #0f172a;
-            line-height: 1.2;
+            line-height: 1.1;
+        }
+        .slab-pct {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            margin-left: 0.3rem;
         }
         .slab-label {
-            font-size: 0.85rem;
-            font-weight: 600;
+            font-size: 0.8rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
             color: #1e293b;
-            margin-top: 0.3rem;
+            margin-top: 0.25rem;
         }
         .slab-gift {
-            font-size: 0.78rem;
+            font-size: 0.73rem;
             font-weight: 500;
-            color: #475569;
-            margin-top: 0.2rem;
+            color: #64748b;
+            margin-top: 0.15rem;
+            font-style: italic;
         }
 
-        /* KPI cards */
-        .kpi-card {
-            background: #ffffff;
-            border: 1px solid #cbd5e1;
-            border-radius: 0.6rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-            padding: 1.1rem;
-            text-align: center;
-        }
-        .kpi-label {
-            font-size: 0.82rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #334155;
-            margin-bottom: 0.3rem;
-        }
-        .kpi-value {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #0f172a;
-        }
-
-        /* Total row styling for tables */
+        /* ── Total row styling for tables ── */
         .total-row {
             font-weight: 800;
             background-color: #e2e8f0;
         }
 
-        /* Table styling */
+        /* ── Table styling ── */
         .stDataFrame [data-testid="stDataFrameResizable"] {
-            border: 1px solid #94a3b8;
-            border-radius: 0.5rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.6rem;
+            overflow: hidden;
         }
         .stDataFrame thead tr th {
             background-color: #1e293b !important;
             color: #ffffff !important;
-            font-weight: 800 !important;
-            font-size: 0.85rem !important;
+            font-weight: 700 !important;
+            font-size: 0.82rem !important;
+            letter-spacing: 0.02em !important;
         }
         /* Bold headers in Streamlit dataframe (glide-data-grid) */
         [data-testid="stDataFrame"] [role="columnheader"],
@@ -391,7 +483,7 @@ def inject_custom_css() -> None:
             font-weight: 800 !important;
         }
         .stDataFrame tbody tr:nth-child(even) {
-            background-color: #f1f5f9 !important;
+            background-color: #f8fafc !important;
         }
         .stDataFrame tbody tr:nth-child(odd) {
             background-color: #ffffff !important;
@@ -400,42 +492,57 @@ def inject_custom_css() -> None:
             background-color: #e2e8f0 !important;
         }
 
-        /* Hide Streamlit chrome */
+        /* ── Hide Streamlit chrome ── */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
 
-        /* Streamlit tab styling */
+        /* ── Streamlit tab styling ── */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 0.5rem;
-            border-bottom: 2px solid #cbd5e1;
+            gap: 0;
+            background: #ffffff;
+            border-radius: 0.6rem 0.6rem 0 0;
+            border-bottom: 2px solid #e2e8f0;
+            padding: 0 0.5rem;
         }
         .stTabs [data-baseweb="tab"] {
-            padding: 0.6rem 1.2rem;
-            font-size: 0.9rem;
+            padding: 0.7rem 1.5rem;
+            font-size: 0.88rem;
             font-weight: 600;
+            color: #64748b;
+            border-bottom: 3px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .stTabs [data-baseweb="tab"]:hover {
             color: #334155;
         }
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
             font-weight: 700;
-            color: #0f172a;
+            color: #1e40af;
             border-bottom: 3px solid #2563eb;
         }
 
-        /* Filter dropdowns */
+        /* ── Filter dropdowns ── */
         .stSelectbox label {
             font-weight: 600 !important;
-            color: #1e293b !important;
-            font-size: 0.85rem !important;
+            color: #334155 !important;
+            font-size: 0.8rem !important;
         }
         .stSelectbox [data-baseweb="select"] {
-            border-color: #94a3b8 !important;
+            border-color: #cbd5e1 !important;
+            border-radius: 0.4rem !important;
         }
 
-        /* Subheaders */
-        .stSubheader, h3, h2 {
+        /* ── Subheaders ── */
+        h2, h3 {
             color: #0f172a !important;
             font-weight: 700 !important;
+        }
+
+        /* ── Caption / data source ── */
+        .stCaption, [data-testid="stCaptionContainer"] {
+            color: #94a3b8 !important;
+            font-size: 0.75rem !important;
         }
         </style>
         """,
@@ -615,6 +722,7 @@ def render_summary_top(df: pd.DataFrame) -> None:
         df: Filtered DataFrame.
     """
     # --- KPI Row ---
+    st.markdown('<div class="section-title">Key Metrics</div>', unsafe_allow_html=True)
     total_dealers = len(df)
     total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
     shop_qual_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
@@ -646,28 +754,36 @@ def render_summary_top(df: pd.DataFrame) -> None:
                 unsafe_allow_html=True,
             )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
 
     # --- Slab Distribution Cards ---
     if "Qualified Slab" in df.columns:
+        total_count = len(df)
         slab_counts = df["Qualified Slab"].value_counts()
+        st.markdown('<div class="section-title">Slab Distribution</div>', unsafe_allow_html=True)
         card_cols = st.columns(len(SLAB_CONFIG))
         for col, cfg in zip(card_cols, SLAB_CONFIG):
             count = int(slab_counts.get(cfg["slab"], 0))
+            pct = f"{count / total_count * 100:.1f}%" if total_count > 0 else "0%"
             color = cfg["color"]
             with col:
                 st.markdown(
                     f"""
-                    <div class="slab-card" style="border-left-color: {color};">
-                        <div class="slab-count" style="color: {color};">{count}</div>
-                        <div class="slab-label">{cfg['slab']} — {cfg['range']} pts</div>
-                        <div class="slab-gift">{cfg['gift']}</div>
+                    <div class="slab-card">
+                        <div class="slab-color-band" style="background: {color};"></div>
+                        <div class="slab-card-body">
+                            <div class="slab-count" style="color: {color};">
+                                {count}<span class="slab-pct">({pct})</span>
+                            </div>
+                            <div class="slab-label">{cfg['slab']} — {cfg['range']} pts</div>
+                            <div class="slab-gift">{cfg['gift']}</div>
+                        </div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
 
 
 def render_summary(df: pd.DataFrame) -> None:
@@ -894,8 +1010,11 @@ def main() -> None:
     st.markdown(
         """
         <div class="header-bar">
-            <h1>📊 Q4 Scheme Dashboard</h1>
-            <span>Slab Analysis & Dealer Tracker</span>
+            <h1>Q4 Scheme Dashboard</h1>
+            <div class="header-right">
+                <span class="header-subtitle">Slab Analysis & Dealer Tracker</span>
+                <span class="header-badge">Q4 FY 2024-25</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -909,8 +1028,13 @@ def main() -> None:
     st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter)")
 
     # --- Global Cascading Filters ---
+    st.markdown(
+        '<div class="filter-panel"><div class="filter-panel-title">&#9660; Filters</div>',
+        unsafe_allow_html=True,
+    )
     summary_filters = ["Qualified Slab", "Zone", "State", "District", "Distributor Name"]
     filtered_df = render_cascading_filters(df, key="global", filter_fields=summary_filters)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # --- Summary on top (filtered) ---
     render_summary_top(filtered_df)
