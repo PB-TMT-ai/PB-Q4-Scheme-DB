@@ -83,6 +83,7 @@ SLAB_CONFIG: list[dict] = [
         "gift": "No Gift",
         "gift_full": "No Gift",
         "category": "Unqualified",
+        "volume_mt": 0,
         "color": "#94a3b8",
         "color_light": "#f1f5f9",
     },
@@ -95,6 +96,7 @@ SLAB_CONFIG: list[dict] = [
         "gift": "Foot Massager",
         "gift_full": "Foot massager",
         "category": "A",
+        "volume_mt": 30,
         "color": "#f59e0b",
         "color_light": "#fef3c7",
     },
@@ -107,6 +109,7 @@ SLAB_CONFIG: list[dict] = [
         "gift": "Sony Sound Bar",
         "gift_full": "Sony - Sound bar, woofer and speakers",
         "category": "B",
+        "volume_mt": 120,
         "color": "#6366f1",
         "color_light": "#e0e7ff",
     },
@@ -119,6 +122,7 @@ SLAB_CONFIG: list[dict] = [
         "gift": "Robot Vacuum",
         "gift_full": "Robot Vacuum cleaner",
         "category": "C",
+        "volume_mt": 168,
         "color": "#10b981",
         "color_light": "#d1fae5",
     },
@@ -131,6 +135,7 @@ SLAB_CONFIG: list[dict] = [
         "gift": "Apple iPad",
         "gift_full": "Apple iPad",
         "category": "D",
+        "volume_mt": 272,
         "color": "#3b82f6",
         "color_light": "#dbeafe",
     },
@@ -143,6 +148,7 @@ SLAB_CONFIG: list[dict] = [
         "gift": "Washing Machine",
         "gift_full": "Samsung front-load washing machine",
         "category": "E",
+        "volume_mt": 300,
         "color": "#ec4899",
         "color_light": "#fce7f3",
     },
@@ -169,6 +175,13 @@ NEXT_SLAB_THRESHOLD: dict[str, Optional[float]] = {}
 for _i, _cfg in enumerate(SLAB_CONFIG):
     NEXT_SLAB_THRESHOLD[_cfg["slab"]] = (
         SLAB_CONFIG[_i + 1]["lower"] if _i + 1 < len(SLAB_CONFIG) else None
+    )
+
+# Volume (MT) threshold to reach next slab
+NEXT_SLAB_VOLUME: dict[str, Optional[float]] = {}
+for _i, _cfg in enumerate(SLAB_CONFIG):
+    NEXT_SLAB_VOLUME[_cfg["slab"]] = (
+        SLAB_CONFIG[_i + 1]["volume_mt"] if _i + 1 < len(SLAB_CONFIG) else None
     )
 
 
@@ -704,13 +717,31 @@ def render_summary(df: pd.DataFrame) -> None:
 # SECTION 7 — TAB: DEALER DETAILS
 # ============================================================================
 
+def _calc_vol_to_achieve(slab: str, total_volume: float) -> float:
+    """Calculate volume remaining to reach the next slab tier.
+
+    Args:
+        slab: Current qualified slab label.
+        total_volume: Dealer's current total volume.
+
+    Returns:
+        Volume gap to next slab, or 0 if at max slab.
+    """
+    next_vol = NEXT_SLAB_VOLUME.get(slab)
+    if next_vol is None:
+        return 0
+    vol = float(total_volume) if not pd.isna(total_volume) else 0.0
+    gap = next_vol - vol
+    return max(gap, 0)
+
+
 def render_dealer_details(df: pd.DataFrame) -> None:
     """Render the Dealer Details tab with per-dealer table and filters.
 
     Filters: Distributor Name, State, Dealer Name, Qualified Slab.
     Columns: Dealer Name, Distributor Name, State, Zone,
              Qual. Shop Vol., Qual. Site Vol., Total Volume,
-             Qualified Slab, Next Slab, Qualified Points.
+             Qualified Slab, Next Slab, Vol. to Achieve, Qualified Points.
 
     Args:
         df: Full DataFrame.
@@ -745,13 +776,34 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     }
     display_df = display_df.rename(columns=rename_map)
 
-    # Fill None values for Next Slab / Volume to Qualify (Slab E dealers)
+    # Fill None values for Next Slab (Slab E dealers)
     if "Next Slab" in display_df.columns:
         display_df["Next Slab"] = display_df["Next Slab"].fillna("-")
+
+    # Compute Vol. to Achieve = next slab volume threshold - dealer's Total Volume
+    display_df["Vol. to Achieve"] = display_df.apply(
+        lambda row: _calc_vol_to_achieve(
+            row.get("Qualified Slab", ""),
+            row.get("Total Volume", 0),
+        ),
+        axis=1,
+    )
+
+    # Reorder columns so Vol. to Achieve appears before Qualified Points
+    ordered_cols = [
+        c for c in [
+            "Dealer Name", "Distributor Name", "State", "Zone",
+            "Qual. Shop Vol.", "Qual. Site Vol.", "Total Volume",
+            "Qualified Slab", "Next Slab", "Vol. to Achieve", "Qualified Points",
+        ]
+        if c in display_df.columns
+    ]
+    display_df = display_df[ordered_cols]
+
     # Round all numeric columns to whole numbers
     num_cols = [
         "Qual. Shop Vol.", "Qual. Site Vol.", "Total Volume",
-        "Qualified Points",
+        "Vol. to Achieve", "Qualified Points",
     ]
     for col in num_cols:
         if col in display_df.columns:
@@ -775,7 +827,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     def _bold_key_columns(col: pd.Series) -> list[str]:
         """Bold key columns: Dealer Name, Qualified Slab, Qualified Points."""
         if col.name in ("Dealer Name", "Qualified Slab", "Qualified Points",
-                         "Next Slab"):
+                         "Next Slab", "Vol. to Achieve"):
             return ["font-weight: 700"] * len(col)
         return [""] * len(col)
 
