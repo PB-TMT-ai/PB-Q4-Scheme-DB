@@ -580,10 +580,10 @@ def render_cascading_filters(
 # ============================================================================
 
 def render_summary_top(df: pd.DataFrame) -> None:
-    """Render the top summary section with KPIs and slab cards (no filters).
+    """Render the top summary section with KPIs and slab cards.
 
     Args:
-        df: Full DataFrame.
+        df: Filtered DataFrame.
     """
     # --- KPI Row ---
     total_dealers = len(df)
@@ -642,10 +642,10 @@ def render_summary_top(df: pd.DataFrame) -> None:
 
 
 def render_summary(df: pd.DataFrame) -> None:
-    """Render the Summary tab with slab breakdown table (no filters).
+    """Render the Summary tab with slab breakdown table.
 
     Args:
-        df: Full DataFrame.
+        df: Filtered DataFrame.
     """
     # --- Slab Breakdown Table ---
     st.subheader("Slab Breakdown")
@@ -879,8 +879,12 @@ def main() -> None:
     file_path = _find_excel_file()
     st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter)")
 
-    # --- Summary on top (always visible, no filters) ---
-    render_summary_top(df)
+    # --- Global Cascading Filters ---
+    summary_filters = ["Qualified Slab", "Zone", "State", "District", "Distributor Name"]
+    filtered_df = render_cascading_filters(df, key="global", filter_fields=summary_filters)
+
+    # --- Summary on top (filtered) ---
+    render_summary_top(filtered_df)
 
     # --- Tabs ---
     tab_summary, tab_details = st.tabs([
@@ -889,10 +893,10 @@ def main() -> None:
     ])
 
     with tab_summary:
-        render_summary(df)
+        render_summary(filtered_df)
 
     with tab_details:
-        render_dealer_details(df)
+        render_dealer_details(filtered_df)
 
 
 if __name__ == "__main__":
