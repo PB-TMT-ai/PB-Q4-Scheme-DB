@@ -58,27 +58,32 @@ COLUMN_MAP: dict[str, str] = {
 SLAB_CONFIG: list[dict] = [
     {"slab": "Unqualified", "slab_code": "-", "range": "0 – 749",
      "lower": 0, "upper": 750, "gift": "No Gift",
-     "gift_full": "No Gift", "category": "Unqualified", "color": "#94a3b8"},
+     "gift_full": "No Gift", "category": "Unqualified",
+     "color": "#94a3b8", "color_light": "#f1f5f9"},
     {"slab": "Slab A", "slab_code": "A", "range": "750 – 2,999",
      "lower": 750, "upper": 3000, "gift": "Foot Massager",
-     "gift_full": "Foot massager", "category": "A", "color": "#f59e0b"},
+     "gift_full": "Foot massager", "category": "A",
+     "color": "#f59e0b", "color_light": "#fef3c7"},
     {"slab": "Slab B", "slab_code": "B", "range": "3,000 – 4,199",
      "lower": 3000, "upper": 4200, "gift": "Sony Sound Bar",
      "gift_full": "Sony - Sound bar, woofer and speakers",
-     "category": "B", "color": "#6366f1"},
+     "category": "B", "color": "#6366f1", "color_light": "#e0e7ff"},
     {"slab": "Slab C", "slab_code": "C", "range": "4,200 – 6,799",
      "lower": 4200, "upper": 6800, "gift": "Robot Vacuum",
-     "gift_full": "Robot Vacuum cleaner", "category": "C", "color": "#10b981"},
+     "gift_full": "Robot Vacuum cleaner", "category": "C",
+     "color": "#10b981", "color_light": "#d1fae5"},
     {"slab": "Slab D", "slab_code": "D", "range": "6,800 – 7,499",
      "lower": 6800, "upper": 7500, "gift": "Apple iPad",
-     "gift_full": "Apple iPad", "category": "D", "color": "#3b82f6"},
+     "gift_full": "Apple iPad", "category": "D",
+     "color": "#3b82f6", "color_light": "#dbeafe"},
     {"slab": "Slab E", "slab_code": "E", "range": "7,500+",
      "lower": 7500, "upper": float("inf"), "gift": "Washing Machine",
      "gift_full": "Samsung front-load washing machine",
-     "category": "E", "color": "#ec4899"},
+     "category": "E", "color": "#ec4899", "color_light": "#fce7f3"},
 ]
 
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
+SLAB_COLORS_LIGHT: dict[str, str] = {s["slab"]: s["color_light"] for s in SLAB_CONFIG}
 SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
 
 # ---------------------------------------------------------------------------
@@ -333,8 +338,8 @@ def generate_report(df: pd.DataFrame) -> Path:
 
     detail_cols = [
         c for c in ["Dealer Name", "Distributor Name", "State", "Zone",
-                     "Shop Volume", "Site Volume", "Total Volume",
-                     "Qualified Volume", "Qualified Slab", "Qualified Points"]
+                     "Shop Volume", "Site Volume", "Qualified Volume",
+                     "Total Volume", "Qualified Slab", "Qualified Points"]
         if c in df.columns
     ]
 

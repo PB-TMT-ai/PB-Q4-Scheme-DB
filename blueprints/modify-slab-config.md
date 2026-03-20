@@ -19,13 +19,14 @@ Add or modify entries in the `SLAB_CONFIG` list. Each entry requires:
 | gift_full   | str         | Full gift description                |
 | category    | str         | Grouping category                    |
 | color       | str         | Hex color for UI elements            |
+| color_light | str         | Light hex color for table row backgrounds |
 
 ### 2. Rules
 - **Bounds must be contiguous**: `upper` of slab N must equal `lower` of slab N+1
 - **Last slab** must have `upper: float("inf")`
 - **First slab** must have `lower: 0`
 - **Colors** should be visually distinct
-- All derived dicts (SLAB_GIFT_MAP, SLAB_COLORS, SLAB_CODE_MAP, etc.) auto-update
+- All derived dicts (SLAB_GIFT_MAP, SLAB_COLORS, SLAB_COLORS_LIGHT, SLAB_CODE_MAP, etc.) auto-update
 
 ### 3. Mirror in Scripts
 Update `SLAB_CONFIG` in `scripts/generate_slab_report.py` to match.
