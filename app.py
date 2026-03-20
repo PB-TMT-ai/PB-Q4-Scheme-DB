@@ -17,7 +17,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
 from src.lib.logger import error as log_error
@@ -348,6 +347,26 @@ def inject_custom_css() -> None:
             background-color: #f1f5f9;
         }
 
+        /* Light blue table styling */
+        .stDataFrame [data-testid="stDataFrameResizable"] {
+            border: 1px solid #bfdbfe;
+            border-radius: 0.5rem;
+        }
+        .stDataFrame thead tr th {
+            background-color: #dbeafe !important;
+            color: #1e3a5f !important;
+            font-weight: 600;
+        }
+        .stDataFrame tbody tr:nth-child(even) {
+            background-color: #eff6ff !important;
+        }
+        .stDataFrame tbody tr:nth-child(odd) {
+            background-color: #f8fbff !important;
+        }
+        .stDataFrame tbody tr:hover {
+            background-color: #dbeafe !important;
+        }
+
         /* Hide Streamlit chrome */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
@@ -550,12 +569,16 @@ def render_summary(df: pd.DataFrame) -> None:
     total_qual_vol = filtered["Qualified Volume"].sum() if "Qualified Volume" in filtered.columns else 0
     total_points = filtered["Qualified Points"].sum() if "Qualified Points" in filtered.columns else 0
 
-    kpi_cols = st.columns(4)
+    total_shop_vol = filtered["Shop Volume"].sum() if "Shop Volume" in filtered.columns else 0
+    total_site_vol = filtered["Site Volume"].sum() if "Site Volume" in filtered.columns else 0
+
+    kpi_cols = st.columns(5)
     kpis = [
         ("Total Dealers", format_indian(total_dealers)),
         ("Total Volume (MT)", format_indian(total_volume, decimal=1)),
-        ("Qualified Volume (MT)", format_indian(total_qual_vol, decimal=1)),
-        ("Total Qualified Points", format_indian(total_points)),
+        ("Shop Qual. Volume (MT)", format_indian(total_shop_vol, decimal=1)),
+        ("Site Qual. Volume (MT)", format_indian(total_site_vol, decimal=1)),
+        ("Total Qualified Points", format_indian(total_points, decimal=1)),
     ]
     for col, (label, value) in zip(kpi_cols, kpis):
         with col:
@@ -597,26 +620,30 @@ def render_summary(df: pd.DataFrame) -> None:
     summary_rows = []
     grand_count = 0
     grand_vol = 0.0
-    grand_qual = 0.0
+    grand_shop_vol = 0.0
+    grand_site_vol = 0.0
     grand_pts = 0.0
 
     for cfg in SLAB_CONFIG:
         slab_df = filtered[filtered["Qualified Slab"] == cfg["slab"]]
         count = len(slab_df)
         vol = slab_df["Total Volume"].sum() if "Total Volume" in slab_df.columns else 0
-        qual = slab_df["Qualified Volume"].sum() if "Qualified Volume" in slab_df.columns else 0
+        shop_vol = slab_df["Shop Volume"].sum() if "Shop Volume" in slab_df.columns else 0
+        site_vol = slab_df["Site Volume"].sum() if "Site Volume" in slab_df.columns else 0
         pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
         grand_count += count
         grand_vol += vol
-        grand_qual += qual
+        grand_shop_vol += shop_vol
+        grand_site_vol += site_vol
         grand_pts += pts
         summary_rows.append({
             "Slab": cfg["slab"],
             "Points Range": cfg["range"],
             "Dealer Count": count,
             "Total Volume": format_indian(vol, decimal=1),
-            "Qualified Volume": format_indian(qual, decimal=1),
-            "Total Points": format_indian(pts),
+            "Shop Qual. Volume": format_indian(shop_vol, decimal=1),
+            "Site Qual. Volume": format_indian(site_vol, decimal=1),
+            "Total Points": format_indian(pts, decimal=1),
             "Gift": cfg["gift_full"],
         })
 
@@ -625,44 +652,14 @@ def render_summary(df: pd.DataFrame) -> None:
         "Points Range": "",
         "Dealer Count": grand_count,
         "Total Volume": format_indian(grand_vol, decimal=1),
-        "Qualified Volume": format_indian(grand_qual, decimal=1),
-        "Total Points": format_indian(grand_pts),
+        "Shop Qual. Volume": format_indian(grand_shop_vol, decimal=1),
+        "Site Qual. Volume": format_indian(grand_site_vol, decimal=1),
+        "Total Points": format_indian(grand_pts, decimal=1),
         "Gift": "",
     })
 
     summary_df = pd.DataFrame(summary_rows)
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- Donut Chart: Slab Distribution ---
-    if "Qualified Slab" in filtered.columns:
-        st.subheader("Slab Distribution")
-        slab_counts = filtered["Qualified Slab"].value_counts()
-        labels = [s for s in SLAB_ORDER if s in slab_counts.index]
-        values = [slab_counts[s] for s in labels]
-        colors = [SLAB_COLORS[s] for s in labels]
-
-        fig = go.Figure(
-            data=[
-                go.Pie(
-                    labels=labels,
-                    values=values,
-                    marker=dict(colors=colors),
-                    hole=0.4,
-                    hovertemplate="<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>",
-                    textinfo="percent+label",
-                )
-            ]
-        )
-        fig.update_layout(
-            plot_bgcolor="#ffffff",
-            paper_bgcolor="#ffffff",
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=400,
-            showlegend=True,
-        )
-        st.plotly_chart(fig, use_container_width=True)
 
 
 # ============================================================================
@@ -692,12 +689,19 @@ def render_dealer_details(df: pd.DataFrame) -> None:
         c for c in [
             "Dealer Name", "Distributor Name", "State", "Zone",
             "Shop Volume", "Site Volume", "Total Volume",
-            "Qualified Volume", "Qualified Slab", "Qualified Points",
+            "Qualified Slab", "Qualified Points",
         ]
         if c in filtered.columns
     ]
 
     st.subheader(f"Dealer Details ({len(filtered)} records)")
+
+    # Round numeric columns to 1 decimal
+    display_df = filtered[display_cols].copy()
+    num_cols = ["Shop Volume", "Site Volume", "Total Volume", "Qualified Points"]
+    for col in num_cols:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].round(1)
 
     def _highlight_total_row(row: pd.Series) -> list[str]:
         """Apply bold grey background to total/summary rows."""
@@ -707,7 +711,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
                 return ["font-weight: 700; background-color: #f1f5f9"] * len(row)
         return [""] * len(row)
 
-    styled = filtered[display_cols].style.apply(_highlight_total_row, axis=1)
+    styled = display_df.style.apply(_highlight_total_row, axis=1)
     st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
 
 
