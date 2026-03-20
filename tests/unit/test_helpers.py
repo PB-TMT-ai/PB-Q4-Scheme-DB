@@ -12,12 +12,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from app import (
     NEXT_SLAB_MAP,
-    POINTS_CONFIG,
+    SLAB_CODE_MAP,
     SLAB_CONFIG,
     SLAB_ORDER,
     assign_slab,
-    calculate_qualified_points,
-    calculate_qualified_volume,
     format_indian,
     get_next_slab,
     points_to_next,
@@ -67,82 +65,6 @@ class TestFormatIndian:
 
 
 # ---------------------------------------------------------------------------
-# calculate_qualified_volume
-# ---------------------------------------------------------------------------
-
-class TestCalculateQualifiedVolume:
-    """Tests for the calculate_qualified_volume() function."""
-
-    def test_basic(self) -> None:
-        assert calculate_qualified_volume(100, 50) == 150.0
-
-    def test_zero_site(self) -> None:
-        assert calculate_qualified_volume(200, 0) == 200.0
-
-    def test_zero_shop(self) -> None:
-        assert calculate_qualified_volume(0, 150) == 150.0
-
-    def test_both_zero(self) -> None:
-        assert calculate_qualified_volume(0, 0) == 0.0
-
-    def test_nan_shop(self) -> None:
-        assert calculate_qualified_volume(float("nan"), 100) == 100.0
-
-    def test_nan_site(self) -> None:
-        assert calculate_qualified_volume(50, float("nan")) == 50.0
-
-
-# ---------------------------------------------------------------------------
-# calculate_qualified_points
-# ---------------------------------------------------------------------------
-
-class TestCalculateQualifiedPoints:
-    """Tests for the calculate_qualified_points() function."""
-
-    def test_below_minimum(self) -> None:
-        """Below 30 MT → 0 points."""
-        assert calculate_qualified_points(29) == 0.0
-
-    def test_at_minimum(self) -> None:
-        """Exactly 30 MT → 30 * 25 = 750 (no milestone bonus)."""
-        assert calculate_qualified_points(30) == 750
-
-    def test_no_bonus(self) -> None:
-        """40 MT → 40 * 25 = 1000 (below 50 MT, no bonus)."""
-        assert calculate_qualified_points(40) == 1000
-
-    def test_50mt_bonus(self) -> None:
-        """60 MT → 60 * 25 * 1.10 = 1650."""
-        assert calculate_qualified_points(60) == 1650
-
-    def test_exactly_50mt(self) -> None:
-        """50 MT → 50 * 25 * 1.10 = 1375."""
-        assert calculate_qualified_points(50) == 1375
-
-    def test_100mt_bonus(self) -> None:
-        """100 MT → 100 * 25 * 1.20 = 3000."""
-        assert calculate_qualified_points(100) == 3000
-
-    def test_150mt_bonus(self) -> None:
-        """150 MT → 150 * 25 * 1.30 = 4875."""
-        assert calculate_qualified_points(150) == 4875
-
-    def test_200mt_bonus(self) -> None:
-        """200 MT → 200 * 25 * 1.50 = 7500."""
-        assert calculate_qualified_points(200) == 7500
-
-    def test_above_200mt(self) -> None:
-        """250 MT → 250 * 25 * 1.50 = 9375."""
-        assert calculate_qualified_points(250) == 9375
-
-    def test_zero(self) -> None:
-        assert calculate_qualified_points(0) == 0.0
-
-    def test_nan(self) -> None:
-        assert calculate_qualified_points(float("nan")) == 0.0
-
-
-# ---------------------------------------------------------------------------
 # assign_slab (points-based)
 # ---------------------------------------------------------------------------
 
@@ -158,6 +80,9 @@ class TestAssignSlab:
     def test_at_slab_a(self) -> None:
         assert assign_slab(750) == "Slab A"
 
+    def test_mid_slab_a(self) -> None:
+        assert assign_slab(1500) == "Slab A"
+
     def test_slab_b(self) -> None:
         assert assign_slab(3000) == "Slab B"
 
@@ -171,7 +96,7 @@ class TestAssignSlab:
         assert assign_slab(7500) == "Slab E"
 
     def test_slab_e_high(self) -> None:
-        assert assign_slab(15000) == "Slab E"
+        assert assign_slab(28000) == "Slab E"
 
     def test_nan_input(self) -> None:
         assert assign_slab(float("nan")) == "Unqualified"
@@ -189,6 +114,9 @@ class TestGetNextSlab:
 
     def test_slab_a(self) -> None:
         assert get_next_slab("Slab A") == "Slab B"
+
+    def test_slab_d(self) -> None:
+        assert get_next_slab("Slab D") == "Slab E"
 
     def test_last_slab(self) -> None:
         assert get_next_slab("Slab E") is None
@@ -212,6 +140,10 @@ class TestPointsToNext:
         result = points_to_next(800, "Unqualified")
         assert result == 0.0
 
+    def test_slab_a_to_b(self) -> None:
+        result = points_to_next(2000, "Slab A")
+        assert result == 1000.0
+
     def test_max_slab_returns_none(self) -> None:
         result = points_to_next(10000, "Slab E")
         assert result is None
@@ -233,8 +165,8 @@ class TestSlabConfig:
             assert SLAB_CONFIG[i]["upper"] == SLAB_CONFIG[i + 1]["lower"]
 
     def test_all_required_keys(self) -> None:
-        required = {"slab", "range", "lower", "upper", "gift", "gift_full",
-                     "category", "color"}
+        required = {"slab", "slab_code", "range", "lower", "upper", "gift",
+                     "gift_full", "category", "color"}
         for cfg in SLAB_CONFIG:
             assert required.issubset(cfg.keys()), f"Missing keys in {cfg['slab']}"
 
@@ -247,42 +179,24 @@ class TestSlabConfig:
     def test_first_slab_starts_at_zero(self) -> None:
         assert SLAB_CONFIG[0]["lower"] == 0
 
+    def test_slab_code_map_complete(self) -> None:
+        for cfg in SLAB_CONFIG:
+            assert cfg["slab_code"] in SLAB_CODE_MAP
+            assert SLAB_CODE_MAP[cfg["slab_code"]] == cfg["slab"]
+
 
 # ---------------------------------------------------------------------------
-# End-to-end: volume → points → slab
+# SLAB_CODE_MAP (Excel code → slab name)
 # ---------------------------------------------------------------------------
 
-class TestEndToEnd:
-    """Integration-style tests for the full volume → points → slab pipeline."""
+class TestSlabCodeMap:
+    """Tests for the SLAB_CODE_MAP mapping."""
 
-    def test_30mt_gets_slab_a(self) -> None:
-        """30 MT → 750 pts → Slab A."""
-        vol = calculate_qualified_volume(30, 0)
-        pts = calculate_qualified_points(vol)
-        slab = assign_slab(pts)
-        assert pts == 750
-        assert slab == "Slab A"
+    def test_dash_maps_to_unqualified(self) -> None:
+        assert SLAB_CODE_MAP["-"] == "Unqualified"
 
-    def test_100mt_gets_slab_b(self) -> None:
-        """100 MT → 3000 pts → Slab B."""
-        vol = calculate_qualified_volume(60, 40)
-        pts = calculate_qualified_points(vol)
-        slab = assign_slab(pts)
-        assert pts == 3000
-        assert slab == "Slab B"
+    def test_a_maps_to_slab_a(self) -> None:
+        assert SLAB_CODE_MAP["A"] == "Slab A"
 
-    def test_200mt_gets_slab_e(self) -> None:
-        """200 MT → 7500 pts → Slab E."""
-        vol = calculate_qualified_volume(150, 50)
-        pts = calculate_qualified_points(vol)
-        slab = assign_slab(pts)
-        assert pts == 7500
-        assert slab == "Slab E"
-
-    def test_below_minimum_unqualified(self) -> None:
-        """20 MT → 0 pts → Unqualified."""
-        vol = calculate_qualified_volume(15, 5)
-        pts = calculate_qualified_points(vol)
-        slab = assign_slab(pts)
-        assert pts == 0
-        assert slab == "Unqualified"
+    def test_e_maps_to_slab_e(self) -> None:
+        assert SLAB_CODE_MAP["E"] == "Slab E"

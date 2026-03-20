@@ -1,9 +1,9 @@
 """
-Streamlit Dashboard — Scheme Slab Analysis
-==========================================
+Streamlit Dashboard — Q4 Scheme Slab Analysis
+==============================================
 Single-file Streamlit app structured in numbered sections.
-Place your Excel data file in the data/ directory. Slabs are
-assigned based on Qualified Points (derived from volume).
+Place your Excel data file in the data/ directory.
+Slabs are assigned based on Qualified Points from the source data.
 
 Run: streamlit run app.py
 """
@@ -31,11 +31,22 @@ DATA_DIR: str = "data"
 SHEET_NAME: str = "Sheet1"
 HEADER_ROW: int = 0
 
-# Month column labels in financial-year order (Apr → Mar)
-MONTH_LABELS: list[str] = [
-    "Apr", "May", "Jun", "Jul", "Aug", "Sep",
-    "Oct", "Nov", "Dec", "Jan", "Feb", "Mar",
-]
+# Column name mapping: Excel column → internal standard name
+COLUMN_MAP: dict[str, str] = {
+    "Retailer Name": "Dealer Name",
+    "State Name": "State",
+    "District Name": "District",
+    "Shop vol.": "Shop Volume",
+    "Site vol.": "Site Volume",
+    "Total vol. under scheme": "Qualified Volume",
+    "Total site vol.": "Total Site Volume",
+    "Points": "Qualified Points",
+    "Current gift": "Gift",
+    "Current gift slab": "Current Slab",
+    "Distributor self-counter (Yes/No)": "Self Counter",
+    "Jan + Feb+Mar": "Q4 Volume",
+    "# Unique Site >200 MT": "Unique Site >200 MT",
+}
 
 
 def _find_excel_file() -> Path:
@@ -61,30 +72,23 @@ def _find_excel_file() -> Path:
 # ---------------------------------------------------------------------------
 # SLAB_CONFIG — Single source of truth for all tier definitions
 # ---------------------------------------------------------------------------
-# Bounds are based on QUALIFIED POINTS (not volume).
-# Fields:
-#   slab        — Short label displayed in UI
-#   range       — Human-readable points range string
-#   lower       — Inclusive lower bound (points)
-#   upper       — Exclusive upper bound (use float("inf") for the top tier)
-#   gift        — Short gift/reward label
-#   gift_full   — Full gift description
-#   category    — Grouping category
-#   color       — Hex color for UI elements
+# Bounds are based on QUALIFIED POINTS (from the Excel data).
 
 SLAB_CONFIG: list[dict] = [
     {
         "slab": "Unqualified",
+        "slab_code": "-",
         "range": "0 – 749",
         "lower": 0,
         "upper": 750,
         "gift": "No Gift",
-        "gift_full": "Below minimum qualification",
+        "gift_full": "No Gift",
         "category": "Unqualified",
         "color": "#94a3b8",
     },
     {
         "slab": "Slab A",
+        "slab_code": "A",
         "range": "750 – 2,999",
         "lower": 750,
         "upper": 3000,
@@ -95,16 +99,18 @@ SLAB_CONFIG: list[dict] = [
     },
     {
         "slab": "Slab B",
+        "slab_code": "B",
         "range": "3,000 – 4,199",
         "lower": 3000,
         "upper": 4200,
         "gift": "Sony Sound Bar",
-        "gift_full": "Sony - sound bar, woofer and speakers",
+        "gift_full": "Sony - Sound bar, woofer and speakers",
         "category": "B",
         "color": "#6366f1",
     },
     {
         "slab": "Slab C",
+        "slab_code": "C",
         "range": "4,200 – 6,799",
         "lower": 4200,
         "upper": 6800,
@@ -115,6 +121,7 @@ SLAB_CONFIG: list[dict] = [
     },
     {
         "slab": "Slab D",
+        "slab_code": "D",
         "range": "6,800 – 7,499",
         "lower": 6800,
         "upper": 7500,
@@ -125,6 +132,7 @@ SLAB_CONFIG: list[dict] = [
     },
     {
         "slab": "Slab E",
+        "slab_code": "E",
         "range": "7,500+",
         "lower": 7500,
         "upper": float("inf"),
@@ -140,35 +148,22 @@ SLAB_GIFT_MAP: dict[str, str] = {s["slab"]: s["gift_full"] for s in SLAB_CONFIG}
 SLAB_COLORS: dict[str, str] = {s["slab"]: s["color"] for s in SLAB_CONFIG}
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
 
-# Next-slab mapping (each slab → next higher slab, top tier → None)
+# Map Excel slab codes (A, B, C, ...) to full slab names
+SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
+
+# Next-slab mapping
 NEXT_SLAB_MAP: dict[str, Optional[str]] = {}
 for _i, _cfg in enumerate(SLAB_CONFIG):
     NEXT_SLAB_MAP[_cfg["slab"]] = (
         SLAB_CONFIG[_i + 1]["slab"] if _i + 1 < len(SLAB_CONFIG) else None
     )
 
-# Points threshold to reach next slab (lower bound of next slab)
+# Points threshold to reach next slab
 NEXT_SLAB_THRESHOLD: dict[str, Optional[float]] = {}
 for _i, _cfg in enumerate(SLAB_CONFIG):
     NEXT_SLAB_THRESHOLD[_cfg["slab"]] = (
         SLAB_CONFIG[_i + 1]["lower"] if _i + 1 < len(SLAB_CONFIG) else None
     )
-
-# ---------------------------------------------------------------------------
-# POINTS_CONFIG — Qualified points calculation rules
-# ---------------------------------------------------------------------------
-# Milestones sorted descending so we match the highest applicable bonus first.
-
-POINTS_CONFIG: dict = {
-    "min_volume_mt": 30,
-    "points_per_mt": 25,
-    "milestones": [
-        {"threshold": 200, "bonus_pct": 50},
-        {"threshold": 150, "bonus_pct": 30},
-        {"threshold": 100, "bonus_pct": 20},
-        {"threshold": 50, "bonus_pct": 10},
-    ],
-}
 
 
 # ============================================================================
@@ -219,59 +214,6 @@ def format_indian(number: float, prefix: str = "", decimal: int = 0) -> str:
     return result
 
 
-def calculate_qualified_volume(shop_vol: float, site_vol: float) -> float:
-    """Calculate qualified volume from shop and site volumes.
-
-    Site volume is assumed to be pre-calculated (already capped at 200 MT
-    per unique site per quarter in the source data).
-
-    Args:
-        shop_vol: Total shop volume.
-        site_vol: Total site volume (pre-capped).
-
-    Returns:
-        Combined qualified volume.
-    """
-    shop = float(shop_vol) if not pd.isna(shop_vol) else 0.0
-    site = float(site_vol) if not pd.isna(site_vol) else 0.0
-    return shop + site
-
-
-def calculate_qualified_points(qualified_vol_mt: float) -> float:
-    """Calculate qualified points from qualified volume.
-
-    Rules:
-        - Below min_volume_mt (30 MT) → 0 points
-        - Base: 1 MT = 25 points
-        - Milestone bonuses (highest applicable):
-          200+ MT → +50%, 150+ MT → +30%, 100+ MT → +20%, 50+ MT → +10%
-
-    Args:
-        qualified_vol_mt: Qualified volume in MT.
-
-    Returns:
-        Calculated points (rounded to nearest integer).
-    """
-    if pd.isna(qualified_vol_mt):
-        qualified_vol_mt = 0.0
-    vol = float(qualified_vol_mt)
-
-    if vol < POINTS_CONFIG["min_volume_mt"]:
-        return 0.0
-
-    base_points = vol * POINTS_CONFIG["points_per_mt"]
-
-    # Find highest applicable milestone bonus
-    bonus_pct = 0
-    for milestone in POINTS_CONFIG["milestones"]:
-        if vol >= milestone["threshold"]:
-            bonus_pct = milestone["bonus_pct"]
-            break
-
-    total = base_points * (1 + bonus_pct / 100)
-    return round(total)
-
-
 def assign_slab(points: float) -> str:
     """Assign a slab label based on qualified points using SLAB_CONFIG.
 
@@ -287,7 +229,6 @@ def assign_slab(points: float) -> str:
     for cfg in SLAB_CONFIG:
         if cfg["lower"] <= points < cfg["upper"]:
             return cfg["slab"]
-    # Fallback to first slab
     return SLAB_CONFIG[0]["slab"]
 
 
@@ -325,11 +266,7 @@ def points_to_next(points: float, current: str) -> Optional[float]:
 # ============================================================================
 
 def inject_custom_css() -> None:
-    """Inject custom CSS styles into the Streamlit app.
-
-    Defines card layouts, KPI styling, slab cards, and hides default
-    Streamlit chrome (main menu, footer).
-    """
+    """Inject custom CSS styles into the Streamlit app."""
     st.markdown(
         """
         <style>
@@ -435,15 +372,15 @@ def inject_custom_css() -> None:
 # ============================================================================
 
 @st.cache_data
-def load_data() -> tuple[pd.DataFrame, list[str]]:
-    """Load and clean the Excel data file.
+def load_data() -> pd.DataFrame:
+    """Load, clean, and return the Excel data.
 
-    Reads the latest .xlsx from DATA_DIR, renames month columns to short
-    labels, coerces numerics, cleans text fields, and derives slab columns
-    based on qualified points.
+    Reads the latest .xlsx from DATA_DIR, renames columns to standard names,
+    excludes self-counter dealers, and derives the Qualified Slab from the
+    pre-calculated Points column in the Excel.
 
     Returns:
-        Tuple of (cleaned DataFrame, list of month column names).
+        Cleaned DataFrame.
     """
     file_path = _find_excel_file()
     log_info(f"Loading data from {file_path}")
@@ -466,51 +403,30 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
 
     log_info(f"Loaded {len(df)} rows, {len(df.columns)} columns")
 
-    # --- Rename month columns ---
-    col_map: dict[str, str] = {}
-    month_cols: list[str] = []
+    # --- Rename columns to standard names ---
+    rename_map = {k: v for k, v in COLUMN_MAP.items() if k in df.columns}
+    df = df.rename(columns=rename_map)
+    log_info(f"Renamed columns: {list(rename_map.values())}")
 
-    for col in df.columns:
-        matched = False
-        if hasattr(col, "strftime"):
-            short = col.strftime("%b")
-            if short in MONTH_LABELS and short not in col_map.values():
-                col_map[col] = short
-                month_cols.append(short)
-                matched = True
-        if not matched and isinstance(col, str):
-            col_str = col.strip()
-            for label in MONTH_LABELS:
-                if col_str.lower().startswith(label.lower()) and label not in col_map.values():
-                    col_map[col] = label
-                    month_cols.append(label)
-                    break
+    # --- Exclude self-counter dealers ---
+    if "Self Counter" in df.columns:
+        before = len(df)
+        df["Self Counter"] = df["Self Counter"].fillna("").astype(str).str.strip().str.title()
+        df = df[df["Self Counter"] != "Yes"].copy()
+        excluded = before - len(df)
+        log_info(f"Excluded {excluded} self-counter dealers ({len(df)} remaining)")
 
-    if col_map:
-        df = df.rename(columns=col_map)
-
-    if not month_cols:
-        for label in MONTH_LABELS:
-            if label in df.columns:
-                month_cols.append(label)
-
-    log_info(f"Month columns identified: {month_cols}")
-
-    # --- Coerce month columns to numeric ---
-    for col in month_cols:
+    # --- Coerce numeric columns ---
+    numeric_cols = [
+        "Qualified Volume", "Total Site Volume", "Qualified Points",
+        "Shop Volume", "Site Volume", "Q4 Volume", "Unique Site >200 MT",
+    ]
+    for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
-    # --- Coerce volume/aggregate columns to numeric ---
-    numeric_keywords = ["total", "volume", "qty", "quantity", "amount", "value", "shop", "site"]
-    for col in df.columns:
-        if isinstance(col, str) and any(kw in col.lower() for kw in numeric_keywords):
-            if col not in month_cols:
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
     # --- Clean text columns ---
-    text_cols = ["State", "Zone", "District", "Distributor Name", "Region",
-                 "Dealer Name"]
+    text_cols = ["Dealer Name", "Distributor Name", "State", "District", "Zone"]
     for col in text_cols:
         if col in df.columns:
             df[col] = (
@@ -522,89 +438,34 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
                 .replace({"Nan": "", "None": "", "0": "", "0.0": ""})
             )
 
-    # --- Clean flag columns (Yes/No fields) ---
-    flag_candidates = [
-        c for c in df.columns
-        if isinstance(c, str) and (
-            "flag" in c.lower()
-            or "status" in c.lower()
-            or "eligible" in c.lower()
-            or "self" in c.lower()
-        )
-    ]
-    for col in flag_candidates:
-        df[col] = (
-            df[col]
-            .fillna("")
-            .astype(str)
-            .str.strip()
-            .str.title()
-        )
-
-    # --- Total Volume (sum of month columns if not present) ---
-    if month_cols and "Total Volume" not in df.columns:
-        df["Total Volume"] = df[month_cols].sum(axis=1)
-
-    # --- Shop Volume / Site Volume ---
-    # Look for columns containing "shop" and "site" for volume bifurcation
-    shop_col = _find_column(df, ["Shop Volume", "Shop Vol", "Shop"])
-    site_col = _find_column(df, ["Site Volume", "Site Vol", "Site"])
-
-    if shop_col:
-        df["Shop Volume"] = pd.to_numeric(df[shop_col], errors="coerce").fillna(0.0)
-        if shop_col != "Shop Volume":
-            log_info(f"Mapped '{shop_col}' → 'Shop Volume'")
+    # --- Total Volume (Shop + Site as raw total) ---
+    if "Shop Volume" in df.columns and "Site Volume" in df.columns:
+        df["Total Volume"] = df["Shop Volume"] + df["Site Volume"]
+    elif "Q4 Volume" in df.columns:
+        df["Total Volume"] = df["Q4 Volume"]
     else:
-        df["Shop Volume"] = 0.0
-        log_info("No Shop Volume column found — defaulting to 0")
+        df["Total Volume"] = 0.0
 
-    if site_col:
-        df["Site Volume"] = pd.to_numeric(df[site_col], errors="coerce").fillna(0.0)
-        if site_col != "Site Volume":
-            log_info(f"Mapped '{site_col}' → 'Site Volume'")
+    # --- Derive Qualified Slab from Points ---
+    if "Qualified Points" in df.columns:
+        df["Qualified Slab"] = df["Qualified Points"].apply(assign_slab)
+    elif "Current Slab" in df.columns:
+        # Fallback: map from Excel slab code
+        df["Current Slab"] = df["Current Slab"].fillna("-").astype(str).str.strip()
+        df["Qualified Slab"] = df["Current Slab"].map(SLAB_CODE_MAP).fillna("Unqualified")
     else:
-        df["Site Volume"] = 0.0
-        log_info("No Site Volume column found — defaulting to 0")
+        df["Qualified Slab"] = "Unqualified"
 
-    # --- Derived columns ---
-    df["Qualified Volume"] = df.apply(
-        lambda row: calculate_qualified_volume(row["Shop Volume"], row["Site Volume"]),
-        axis=1,
-    )
-
-    df["Qualified Points"] = df["Qualified Volume"].apply(calculate_qualified_points)
-    df["Qualified Slab"] = df["Qualified Points"].apply(assign_slab)
-
-    df["Lifting Frequency"] = (
-        df[month_cols].gt(0).sum(axis=1) if month_cols else 0
-    )
+    # --- Next slab & points gap ---
     df["Next Upgrade Slab"] = df["Qualified Slab"].apply(get_next_slab)
-    df["Points to Next Slab"] = df.apply(
-        lambda row: points_to_next(row["Qualified Points"], row["Qualified Slab"]),
-        axis=1,
-    )
+    if "Qualified Points" in df.columns:
+        df["Points to Next Slab"] = df.apply(
+            lambda row: points_to_next(row["Qualified Points"], row["Qualified Slab"]),
+            axis=1,
+        )
 
     log_info(f"Data loading complete. Shape: {df.shape}")
-    return df, month_cols
-
-
-def _find_column(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
-    """Find the first matching column name from a list of candidates.
-
-    Performs case-insensitive matching against DataFrame columns.
-
-    Args:
-        df: DataFrame to search.
-        candidates: List of candidate column names in priority order.
-
-    Returns:
-        Matching column name from df.columns, or None.
-    """
-    col_lower_map = {c.lower().strip(): c for c in df.columns if isinstance(c, str)}
-    for name in candidates:
-        if name.lower().strip() in col_lower_map:
-            return col_lower_map[name.lower().strip()]
-    return None
+    return df
 
 
 # ============================================================================
@@ -631,27 +492,20 @@ def render_cascading_filters(
 ) -> pd.DataFrame:
     """Render cascading dropdown filters and return the filtered DataFrame.
 
-    Creates a row of selectbox filters where each selection narrows the
-    options available in subsequent dropdowns.
-
     Args:
         df: Input DataFrame to filter.
         key: Unique key prefix for widget state (use different keys per tab).
         filter_fields: Optional explicit list of column names to filter on.
-            If None, uses default geo hierarchy + slab.
 
     Returns:
         Filtered DataFrame based on user selections.
     """
     if filter_fields is None:
         filter_fields = [
-            col for col in ["Zone", "State", "Region", "District", "Distributor Name"]
+            col for col in ["Qualified Slab", "Zone", "State", "District", "Distributor Name"]
             if col in df.columns
         ]
-        if "Qualified Slab" in df.columns:
-            filter_fields = ["Qualified Slab"] + filter_fields
 
-    # Only keep fields that exist in df
     filter_fields = [f for f in filter_fields if f in df.columns]
 
     if not filter_fields:
@@ -678,12 +532,11 @@ def render_cascading_filters(
 # SECTION 6 — TAB: SUMMARY
 # ============================================================================
 
-def render_summary(df: pd.DataFrame, month_cols: list[str]) -> None:
+def render_summary(df: pd.DataFrame) -> None:
     """Render the Summary tab with KPIs, slab cards, breakdown table and chart.
 
     Args:
         df: Full DataFrame.
-        month_cols: List of month column names.
     """
     filtered = render_cascading_filters(df, key="summary")
 
@@ -816,17 +669,16 @@ def render_summary(df: pd.DataFrame, month_cols: list[str]) -> None:
 # SECTION 7 — TAB: DEALER DETAILS
 # ============================================================================
 
-def render_dealer_details(df: pd.DataFrame, month_cols: list[str]) -> None:
+def render_dealer_details(df: pd.DataFrame) -> None:
     """Render the Dealer Details tab with per-dealer table and filters.
 
     Filters: Distributor Name, State, Dealer Name, Qualified Slab.
-    Columns: Dealer Name, Distributor Name, State, Region, Shop Volume,
-             Site Volume, Total Volume, Qualified Volume, Qualified Slab,
-             Qualified Points.
+    Columns: Dealer Name, Distributor Name, State, Region/Zone,
+             Shop Volume, Site Volume, Total Volume, Qualified Volume,
+             Qualified Slab, Qualified Points.
 
     Args:
         df: Full DataFrame.
-        month_cols: List of month column names.
     """
     detail_filters = ["Distributor Name", "State", "Dealer Name", "Qualified Slab"]
     filtered = render_cascading_filters(df, key="dealer_detail", filter_fields=detail_filters)
@@ -838,7 +690,7 @@ def render_dealer_details(df: pd.DataFrame, month_cols: list[str]) -> None:
     # --- Data Table ---
     display_cols = [
         c for c in [
-            "Dealer Name", "Distributor Name", "State", "Region",
+            "Dealer Name", "Distributor Name", "State", "Zone",
             "Shop Volume", "Site Volume", "Total Volume",
             "Qualified Volume", "Qualified Slab", "Qualified Points",
         ]
@@ -866,7 +718,7 @@ def render_dealer_details(df: pd.DataFrame, month_cols: list[str]) -> None:
 def main() -> None:
     """Entry point for the Streamlit dashboard application."""
     st.set_page_config(
-        page_title="Scheme Dashboard",
+        page_title="Q4 Scheme Dashboard",
         layout="wide",
         page_icon="📊",
     )
@@ -877,7 +729,7 @@ def main() -> None:
     st.markdown(
         """
         <div class="header-bar">
-            <h1>📊 Scheme Dashboard</h1>
+            <h1>📊 Q4 Scheme Dashboard</h1>
             <span>Slab Analysis & Dealer Tracker</span>
         </div>
         """,
@@ -885,11 +737,11 @@ def main() -> None:
     )
 
     # --- Load Data ---
-    df, month_cols = load_data()
+    df = load_data()
 
     # --- File info ---
     file_path = _find_excel_file()
-    st.caption(f"Data source: `{file_path.name}` — {len(df)} records loaded")
+    st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter)")
 
     # --- Tabs ---
     tab_summary, tab_details = st.tabs([
@@ -898,10 +750,10 @@ def main() -> None:
     ])
 
     with tab_summary:
-        render_summary(df, month_cols)
+        render_summary(df)
 
     with tab_details:
-        render_dealer_details(df, month_cols)
+        render_dealer_details(df)
 
 
 if __name__ == "__main__":

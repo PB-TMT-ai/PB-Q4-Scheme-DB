@@ -35,7 +35,7 @@ env/
 .DS_Store
 Thumbs.db
 
-# Data (keep directory, ignore large files)
-data/*.xlsx
+# Data (keep directory, track xlsx for Streamlit Cloud deployment)
+!data/*.xlsx
 data/*.xls
 !data/.gitkeep
