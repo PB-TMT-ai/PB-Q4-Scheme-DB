@@ -293,38 +293,38 @@ def inject_custom_css() -> None:
 
         /* Slab cards */
         .slab-card {
-            background: #ffffff;
+            background: linear-gradient(135deg, #f0f7ff, #e8f2ff);
             border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px rgba(59,130,246,0.10);
             padding: 1rem 1.2rem;
-            border-left: 4px solid #e2e8f0;
+            border-left: 4px solid #bfdbfe;
             margin-bottom: 0.5rem;
         }
         .slab-count {
             font-size: 1.7rem;
             font-weight: 700;
-            color: #0f172a;
+            color: #1e40af;
             line-height: 1.2;
         }
         .slab-label {
             font-size: 0.78rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #64748b;
+            color: #3b82f6;
             margin-top: 0.25rem;
         }
         .slab-gift {
             font-size: 0.72rem;
-            color: #94a3b8;
+            color: #93c5fd;
             margin-top: 0.15rem;
         }
 
         /* KPI cards */
         .kpi-card {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
+            background: linear-gradient(135deg, #f8fbff, #eff6ff);
+            border: 1px solid #dbeafe;
             border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px rgba(59,130,246,0.08);
             padding: 1rem;
             text-align: center;
         }
@@ -332,19 +332,19 @@ def inject_custom_css() -> None:
             font-size: 0.78rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #64748b;
+            color: #3b82f6;
             margin-bottom: 0.25rem;
         }
         .kpi-value {
             font-size: 1.35rem;
             font-weight: 700;
-            color: #0f172a;
+            color: #1e3a5f;
         }
 
         /* Total row styling for tables */
         .total-row {
             font-weight: 700;
-            background-color: #f1f5f9;
+            background-color: #eff6ff;
         }
 
         /* Light blue table styling */
@@ -551,23 +551,18 @@ def render_cascading_filters(
 # SECTION 6 — TAB: SUMMARY
 # ============================================================================
 
-def render_summary(df: pd.DataFrame) -> None:
-    """Render the Summary tab with KPIs, slab cards, breakdown table and chart.
+def render_summary_top(df: pd.DataFrame) -> None:
+    """Render the top summary section with KPIs and slab cards (no filters).
 
     Args:
         df: Full DataFrame.
     """
-    filtered = render_cascading_filters(df, key="summary")
-
-    if filtered.empty:
-        st.info("No data matches the selected filters.")
-        return
-
     # --- KPI Row ---
-    total_dealers = len(filtered)
-    total_volume = filtered["Total Volume"].sum() if "Total Volume" in filtered.columns else 0
-    total_qual_vol = filtered["Qualified Volume"].sum() if "Qualified Volume" in filtered.columns else 0
-    total_points = filtered["Qualified Points"].sum() if "Qualified Points" in filtered.columns else 0
+    total_dealers = len(df)
+    total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
+    shop_qual_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
+    site_qual_vol = df["Site Volume"].sum() if "Site Volume" in df.columns else 0
+    total_points = df["Qualified Points"].sum() if "Qualified Points" in df.columns else 0
 
     total_shop_vol = filtered["Shop Volume"].sum() if "Shop Volume" in filtered.columns else 0
     total_site_vol = filtered["Site Volume"].sum() if "Site Volume" in filtered.columns else 0
@@ -595,8 +590,8 @@ def render_summary(df: pd.DataFrame) -> None:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # --- Slab Distribution Cards ---
-    if "Qualified Slab" in filtered.columns:
-        slab_counts = filtered["Qualified Slab"].value_counts()
+    if "Qualified Slab" in df.columns:
+        slab_counts = df["Qualified Slab"].value_counts()
         card_cols = st.columns(len(SLAB_CONFIG))
         for col, cfg in zip(card_cols, SLAB_CONFIG):
             count = int(slab_counts.get(cfg["slab"], 0))
@@ -615,6 +610,13 @@ def render_summary(df: pd.DataFrame) -> None:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+
+def render_summary(df: pd.DataFrame) -> None:
+    """Render the Summary tab with breakdown table and chart (no filters).
+
+    Args:
+        df: Full DataFrame.
+    """
     # --- Slab Breakdown Table ---
     st.subheader("Slab Breakdown")
     summary_rows = []
@@ -625,7 +627,7 @@ def render_summary(df: pd.DataFrame) -> None:
     grand_pts = 0.0
 
     for cfg in SLAB_CONFIG:
-        slab_df = filtered[filtered["Qualified Slab"] == cfg["slab"]]
+        slab_df = df[df["Qualified Slab"] == cfg["slab"]]
         count = len(slab_df)
         vol = slab_df["Total Volume"].sum() if "Total Volume" in slab_df.columns else 0
         shop_vol = slab_df["Shop Volume"].sum() if "Shop Volume" in slab_df.columns else 0
@@ -746,6 +748,9 @@ def main() -> None:
     # --- File info ---
     file_path = _find_excel_file()
     st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter)")
+
+    # --- Summary on top (always visible, no filters) ---
+    render_summary_top(df)
 
     # --- Tabs ---
     tab_summary, tab_details = st.tabs([
