@@ -560,12 +560,9 @@ def render_summary_top(df: pd.DataFrame) -> None:
     # --- KPI Row ---
     total_dealers = len(df)
     total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
-    shop_qual_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
-    site_qual_vol = df["Site Volume"].sum() if "Site Volume" in df.columns else 0
+    total_shop_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
+    total_site_vol = df["Site Volume"].sum() if "Site Volume" in df.columns else 0
     total_points = df["Qualified Points"].sum() if "Qualified Points" in df.columns else 0
-
-    total_shop_vol = filtered["Shop Volume"].sum() if "Shop Volume" in filtered.columns else 0
-    total_site_vol = filtered["Site Volume"].sum() if "Site Volume" in filtered.columns else 0
 
     kpi_cols = st.columns(5)
     kpis = [
