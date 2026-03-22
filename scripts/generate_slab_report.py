@@ -59,27 +59,29 @@ SLAB_CONFIG: list[dict] = [
     {"slab": "Unqualified", "slab_code": "-", "range": "0 – 749",
      "lower": 0, "upper": 750, "gift": "No Gift",
      "gift_full": "No Gift", "category": "Unqualified",
-     "color": "#94a3b8", "color_light": "#f1f5f9"},
+     "volume_mt": 0, "color": "#94a3b8", "color_light": "#f1f5f9"},
     {"slab": "Slab A", "slab_code": "A", "range": "750 – 2,999",
      "lower": 750, "upper": 3000, "gift": "Foot Massager",
      "gift_full": "Foot massager", "category": "A",
-     "color": "#f59e0b", "color_light": "#fef3c7"},
+     "volume_mt": 30, "color": "#f59e0b", "color_light": "#fef3c7"},
     {"slab": "Slab B", "slab_code": "B", "range": "3,000 – 4,199",
      "lower": 3000, "upper": 4200, "gift": "Sony Sound Bar",
      "gift_full": "Sony - Sound bar, woofer and speakers",
-     "category": "B", "color": "#6366f1", "color_light": "#e0e7ff"},
+     "category": "B", "volume_mt": 120,
+     "color": "#6366f1", "color_light": "#e0e7ff"},
     {"slab": "Slab C", "slab_code": "C", "range": "4,200 – 6,799",
      "lower": 4200, "upper": 6800, "gift": "Robot Vacuum",
      "gift_full": "Robot Vacuum cleaner", "category": "C",
-     "color": "#10b981", "color_light": "#d1fae5"},
+     "volume_mt": 168, "color": "#10b981", "color_light": "#d1fae5"},
     {"slab": "Slab D", "slab_code": "D", "range": "6,800 – 7,499",
      "lower": 6800, "upper": 7500, "gift": "Apple iPad",
      "gift_full": "Apple iPad", "category": "D",
-     "color": "#3b82f6", "color_light": "#dbeafe"},
+     "volume_mt": 272, "color": "#3b82f6", "color_light": "#dbeafe"},
     {"slab": "Slab E", "slab_code": "E", "range": "7,500+",
      "lower": 7500, "upper": float("inf"), "gift": "Washing Machine",
      "gift_full": "Samsung front-load washing machine",
-     "category": "E", "color": "#ec4899", "color_light": "#fce7f3"},
+     "category": "E", "volume_mt": 300,
+     "color": "#ec4899", "color_light": "#fce7f3"},
 ]
 
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
@@ -89,12 +91,16 @@ SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
 # Next-slab mapping (mirrored from app.py)
 NEXT_SLAB_MAP: dict[str, Optional[str]] = {}
 NEXT_SLAB_THRESHOLD: dict[str, Optional[float]] = {}
+NEXT_SLAB_VOLUME: dict[str, Optional[float]] = {}
 for _i, _cfg in enumerate(SLAB_CONFIG):
     NEXT_SLAB_MAP[_cfg["slab"]] = (
         SLAB_CONFIG[_i + 1]["slab"] if _i + 1 < len(SLAB_CONFIG) else None
     )
     NEXT_SLAB_THRESHOLD[_cfg["slab"]] = (
         SLAB_CONFIG[_i + 1]["lower"] if _i + 1 < len(SLAB_CONFIG) else None
+    )
+    NEXT_SLAB_VOLUME[_cfg["slab"]] = (
+        SLAB_CONFIG[_i + 1]["volume_mt"] if _i + 1 < len(SLAB_CONFIG) else None
     )
 
 # ---------------------------------------------------------------------------
@@ -375,9 +381,9 @@ def generate_report(df: pd.DataFrame) -> Path:
         qual = slab_df["Qualified Volume"].sum() if "Qualified Volume" in slab_df.columns else 0
         pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
         ws_summary.append([
-            cfg["slab"], cfg["range"], count, round(vol, 1),
-            round(shop_vol, 1), round(site_vol, 1),
-            round(qual, 1), round(pts, 1), cfg["gift_full"],
+            cfg["slab"], cfg["range"], count, int(round(vol)),
+            int(round(shop_vol)), int(round(site_vol)),
+            int(round(qual)), int(round(pts)), cfg["gift_full"],
         ])
 
     _style_header_row(ws_summary, len(headers))
@@ -401,17 +407,26 @@ def generate_report(df: pd.DataFrame) -> Path:
         "Shop Volume": "Qual. Shop Vol.",
         "Site Volume": "Qual. Site Vol.",
         "Next Upgrade Slab": "Next Slab",
-        "Points to Next Slab": "Volume to Qualify",
     }
     display_headers = [header_rename.get(c, c) for c in detail_cols]
+    # Replace Points to Next Slab with Vol. to Achieve
+    if "Points to Next Slab" in display_headers:
+        display_headers[display_headers.index("Points to Next Slab")] = "Vol. to Achieve"
     ws_detail.append(display_headers)
 
     for _, row in df[detail_cols].iterrows():
         values = []
         for col, val in zip(detail_cols, row.values):
-            if col in ("Shop Volume", "Site Volume", "Total Volume",
-                       "Points to Next Slab", "Qualified Points"):
-                values.append(round(float(val if pd.notna(val) else 0), 1))
+            if col == "Points to Next Slab":
+                # Compute Vol. to Achieve from volume thresholds instead
+                slab = row.get("Qualified Slab", "Unqualified")
+                total_vol = float(row.get("Total Volume", 0) if pd.notna(row.get("Total Volume", 0)) else 0)
+                next_vol = NEXT_SLAB_VOLUME.get(slab)
+                vol_to_achieve = max(next_vol - total_vol, 0) if next_vol is not None else 0
+                values.append(int(round(vol_to_achieve)))
+            elif col in ("Shop Volume", "Site Volume", "Total Volume",
+                         "Qualified Points"):
+                values.append(int(round(float(val if pd.notna(val) else 0))))
             elif col == "Next Upgrade Slab":
                 values.append(str(val) if pd.notna(val) else "-")
             else:
@@ -421,6 +436,117 @@ def generate_report(df: pd.DataFrame) -> Path:
     _style_header_row(ws_detail, len(detail_cols))
     _auto_width(ws_detail)
     ws_detail.freeze_panes = "A2"
+
+    # --- Sheet 3: Near-Upgrade ---
+    ws_upgrade = wb.create_sheet("Near-Upgrade")
+    ws_upgrade.sheet_properties.tabColor = "F59E0B"
+
+    upgrade_headers = [
+        "Dealer Name", "Distributor Name", "State", "Zone",
+        "Qualified Points", "Qualified Slab", "Next Slab", "Pts to Upgrade",
+        "Total Volume",
+    ]
+    ws_upgrade.append(upgrade_headers)
+
+    # Filter to upgradable dealers (exclude top slab) within 500 pts
+    last_slab = SLAB_CONFIG[-1]["slab"]
+    upgradable = df[df["Qualified Slab"] != last_slab].copy()
+    if "Qualified Points" in upgradable.columns:
+        upgradable["Points Gap"] = upgradable.apply(
+            lambda row: points_to_next(row["Qualified Points"], row["Qualified Slab"]) or 0,
+            axis=1,
+        )
+        near = upgradable[upgradable["Points Gap"] <= 500].sort_values("Points Gap")
+
+        for _, row in near.iterrows():
+            ws_upgrade.append([
+                row.get("Dealer Name", ""),
+                row.get("Distributor Name", ""),
+                row.get("State", ""),
+                row.get("Zone", ""),
+                int(round(float(row.get("Qualified Points", 0)))),
+                row.get("Qualified Slab", ""),
+                get_next_slab(row.get("Qualified Slab", "")) or "-",
+                int(round(float(row.get("Points Gap", 0)))),
+                int(round(float(row.get("Total Volume", 0)))),
+            ])
+
+    _style_header_row(ws_upgrade, len(upgrade_headers))
+    _auto_width(ws_upgrade)
+    ws_upgrade.freeze_panes = "A2"
+
+    # --- Helper: write a grouped performance sheet ---
+    def _write_perf_sheet(
+        sheet_name: str,
+        tab_color: str,
+        group_col: str,
+    ) -> None:
+        """Write a performance sheet grouped by the given column."""
+        ws = wb.create_sheet(sheet_name)
+        ws.sheet_properties.tabColor = tab_color
+
+        perf_headers = [
+            group_col, "Dealers", "Total Volume",
+            "Qual. Shop Vol.", "Qual. Site Vol.",
+            "Avg Points", "Total Points", "Qual. Rate %",
+        ] + SLAB_ORDER
+        ws.append(perf_headers)
+
+        valid = df[df[group_col].str.strip() != ""]
+        agg = valid.groupby(group_col).agg(
+            Dealers=("Dealer Name", "count"),
+            Total_Volume=("Total Volume", "sum"),
+            Avg_Points=("Qualified Points", "mean"),
+            Total_Points=("Qualified Points", "sum"),
+            Shop_Volume=("Shop Volume", "sum"),
+            Site_Volume=("Site Volume", "sum"),
+        )
+        agg = agg.sort_values("Dealers", ascending=False)
+
+        smix = valid.groupby([group_col, "Qualified Slab"]).size().unstack(fill_value=0)
+        for slab_name in SLAB_ORDER:
+            if slab_name not in smix.columns:
+                smix[slab_name] = 0
+        smix = smix[SLAB_ORDER]
+
+        if "Unqualified" in smix.columns:
+            smix["Qualified Rate"] = (
+                smix.drop(columns=["Unqualified"]).sum(axis=1)
+                / smix.sum(axis=1) * 100
+            )
+        else:
+            smix["Qualified Rate"] = 100.0
+
+        for name in agg.index:
+            row_data = agg.loc[name]
+            qual_rate = smix.loc[name, "Qualified Rate"] if name in smix.index else 0
+            slab_counts = [
+                int(smix.loc[name, s]) if name in smix.index else 0
+                for s in SLAB_ORDER
+            ]
+            ws.append([
+                name,
+                int(row_data["Dealers"]),
+                int(round(float(row_data["Total_Volume"]))),
+                int(round(float(row_data["Shop_Volume"]))),
+                int(round(float(row_data["Site_Volume"]))),
+                int(round(float(row_data["Avg_Points"]))),
+                int(round(float(row_data["Total_Points"]))),
+                int(round(float(qual_rate))),
+            ] + slab_counts)
+
+        _style_header_row(ws, len(perf_headers))
+        _auto_width(ws)
+        ws.freeze_panes = "A2"
+
+    # --- Sheet 4: Zone Performance ---
+    _write_perf_sheet("Zone Performance", "10B981", "Zone")
+
+    # --- Sheet 5: State Performance ---
+    _write_perf_sheet("State Performance", "3B82F6", "State")
+
+    # --- Sheet 6: Distributor Performance ---
+    _write_perf_sheet("Distributor Performance", "6366F1", "Distributor Name")
 
     # Save
     wb.save(str(output_path))

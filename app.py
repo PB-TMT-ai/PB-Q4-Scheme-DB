@@ -289,98 +289,190 @@ def inject_custom_css() -> None:
     st.markdown(
         """
         <style>
-        /* Header bar */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        /* Global page styling */
+        .stApp {
+            background-color: #f8fafc;
+        }
+        .block-container {
+            padding-top: 1rem !important;
+        }
+
+        /* ── Header bar ── */
         .header-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem 1rem;
-            background: linear-gradient(135deg, #1e293b, #334155);
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%);
+            border-radius: 0.75rem;
+            margin-bottom: 0.75rem;
             color: #ffffff;
+            box-shadow: 0 4px 12px rgba(15,23,42,0.25);
         }
         .header-bar h1 {
             margin: 0;
-            font-size: 1.4rem;
-            font-weight: 700;
+            font-size: 1.5rem;
+            font-weight: 800;
             color: #ffffff;
+            letter-spacing: -0.01em;
         }
-        .header-bar span {
-            font-size: 0.9rem;
+        .header-bar .header-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .header-bar .header-badge {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 2rem;
+            padding: 0.3rem 0.9rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            letter-spacing: 0.03em;
+        }
+        .header-bar .header-subtitle {
+            font-size: 0.85rem;
             font-weight: 500;
-            color: #cbd5e1;
+            color: #94a3b8;
         }
 
-        /* Slab cards */
+        /* ── Section divider ── */
+        .section-divider {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            margin: 0.5rem 0 1rem 0;
+        }
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+
+        /* ── Filter panel ── */
+        .filter-panel {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 0.9rem 1.2rem 0.5rem 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+        .filter-panel-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #64748b;
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* ── KPI cards ── */
+        .kpi-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-top: 3px solid #2563eb;
+            border-radius: 0.6rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 1rem 0.8rem;
+            text-align: center;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .kpi-card:hover {
+            box-shadow: 0 4px 16px rgba(37,99,235,0.12);
+            transform: translateY(-1px);
+        }
+        .kpi-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #64748b;
+            margin-bottom: 0.35rem;
+        }
+        .kpi-value {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+
+        /* ── Slab cards ── */
         .slab-card {
             background: #ffffff;
             border-radius: 0.6rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-            padding: 1.1rem 1.3rem;
-            border-left: 5px solid #bfdbfe;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 0;
             margin-bottom: 0.5rem;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .slab-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            transform: translateY(-1px);
+        }
+        .slab-color-band {
+            height: 5px;
+            width: 100%;
+        }
+        .slab-card-body {
+            padding: 0.9rem 1rem;
         }
         .slab-count {
             font-size: 2rem;
             font-weight: 800;
             color: #0f172a;
-            line-height: 1.2;
+            line-height: 1.1;
+        }
+        .slab-pct {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            margin-left: 0.3rem;
         }
         .slab-label {
-            font-size: 0.85rem;
-            font-weight: 600;
+            font-size: 0.8rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
             color: #1e293b;
-            margin-top: 0.3rem;
+            margin-top: 0.25rem;
         }
         .slab-gift {
-            font-size: 0.78rem;
+            font-size: 0.73rem;
             font-weight: 500;
-            color: #475569;
-            margin-top: 0.2rem;
+            color: #64748b;
+            margin-top: 0.15rem;
+            font-style: italic;
         }
 
-        /* KPI cards */
-        .kpi-card {
-            background: #ffffff;
-            border: 1px solid #cbd5e1;
-            border-radius: 0.6rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-            padding: 1.1rem;
-            text-align: center;
-        }
-        .kpi-label {
-            font-size: 0.82rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #334155;
-            margin-bottom: 0.3rem;
-        }
-        .kpi-value {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #0f172a;
-        }
-
-        /* Total row styling for tables */
+        /* ── Total row styling for tables ── */
         .total-row {
             font-weight: 800;
             background-color: #e2e8f0;
         }
 
-        /* Table styling */
+        /* ── Table styling ── */
         .stDataFrame [data-testid="stDataFrameResizable"] {
-            border: 1px solid #94a3b8;
-            border-radius: 0.5rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.6rem;
+            overflow: hidden;
         }
         .stDataFrame thead tr th {
             background-color: #1e293b !important;
             color: #ffffff !important;
-            font-weight: 800 !important;
-            font-size: 0.85rem !important;
+            font-weight: 700 !important;
+            font-size: 0.82rem !important;
+            letter-spacing: 0.02em !important;
         }
         /* Bold headers in Streamlit dataframe (glide-data-grid) */
         [data-testid="stDataFrame"] [role="columnheader"],
@@ -391,7 +483,7 @@ def inject_custom_css() -> None:
             font-weight: 800 !important;
         }
         .stDataFrame tbody tr:nth-child(even) {
-            background-color: #f1f5f9 !important;
+            background-color: #f8fafc !important;
         }
         .stDataFrame tbody tr:nth-child(odd) {
             background-color: #ffffff !important;
@@ -400,42 +492,57 @@ def inject_custom_css() -> None:
             background-color: #e2e8f0 !important;
         }
 
-        /* Hide Streamlit chrome */
+        /* ── Hide Streamlit chrome ── */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
 
-        /* Streamlit tab styling */
+        /* ── Streamlit tab styling ── */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 0.5rem;
-            border-bottom: 2px solid #cbd5e1;
+            gap: 0;
+            background: #ffffff;
+            border-radius: 0.6rem 0.6rem 0 0;
+            border-bottom: 2px solid #e2e8f0;
+            padding: 0 0.5rem;
         }
         .stTabs [data-baseweb="tab"] {
-            padding: 0.6rem 1.2rem;
-            font-size: 0.9rem;
+            padding: 0.7rem 1.5rem;
+            font-size: 0.88rem;
             font-weight: 600;
+            color: #64748b;
+            border-bottom: 3px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .stTabs [data-baseweb="tab"]:hover {
             color: #334155;
         }
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
             font-weight: 700;
-            color: #0f172a;
+            color: #1e40af;
             border-bottom: 3px solid #2563eb;
         }
 
-        /* Filter dropdowns */
+        /* ── Filter dropdowns ── */
         .stSelectbox label {
             font-weight: 600 !important;
-            color: #1e293b !important;
-            font-size: 0.85rem !important;
+            color: #334155 !important;
+            font-size: 0.8rem !important;
         }
         .stSelectbox [data-baseweb="select"] {
-            border-color: #94a3b8 !important;
+            border-color: #cbd5e1 !important;
+            border-radius: 0.4rem !important;
         }
 
-        /* Subheaders */
-        .stSubheader, h3, h2 {
+        /* ── Subheaders ── */
+        h2, h3 {
             color: #0f172a !important;
             font-weight: 700 !important;
+        }
+
+        /* ── Caption / data source ── */
+        .stCaption, [data-testid="stCaptionContainer"] {
+            color: #94a3b8 !important;
+            font-size: 0.75rem !important;
         }
         </style>
         """,
@@ -615,6 +722,7 @@ def render_summary_top(df: pd.DataFrame) -> None:
         df: Filtered DataFrame.
     """
     # --- KPI Row ---
+    st.markdown('<div class="section-title">Key Metrics</div>', unsafe_allow_html=True)
     total_dealers = len(df)
     total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
     shop_qual_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
@@ -628,11 +736,11 @@ def render_summary_top(df: pd.DataFrame) -> None:
     kpi_cols = st.columns(6)
     kpis = [
         ("Total Dealers", format_indian(total_dealers)),
-        ("Total Volume (MT)", format_indian(total_volume, decimal=1)),
-        ("Qual. Shop Vol. (MT)", format_indian(total_shop_vol, decimal=1)),
-        ("Qual. Site Vol. (MT)", format_indian(total_site_vol, decimal=1)),
-        ("Qualified Volume (MT)", format_indian(total_qual_vol, decimal=1)),
-        ("Total Qualified Points", format_indian(total_points, decimal=1)),
+        ("Total Volume (MT)", format_indian(total_volume, decimal=0)),
+        ("Qual. Shop Vol. (MT)", format_indian(total_shop_vol, decimal=0)),
+        ("Qual. Site Vol. (MT)", format_indian(total_site_vol, decimal=0)),
+        ("Qualified Volume (MT)", format_indian(total_qual_vol, decimal=0)),
+        ("Total Qualified Points", format_indian(total_points, decimal=0)),
     ]
     for col, (label, value) in zip(kpi_cols, kpis):
         with col:
@@ -646,28 +754,36 @@ def render_summary_top(df: pd.DataFrame) -> None:
                 unsafe_allow_html=True,
             )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
 
     # --- Slab Distribution Cards ---
     if "Qualified Slab" in df.columns:
+        total_count = len(df)
         slab_counts = df["Qualified Slab"].value_counts()
+        st.markdown('<div class="section-title">Slab Distribution</div>', unsafe_allow_html=True)
         card_cols = st.columns(len(SLAB_CONFIG))
         for col, cfg in zip(card_cols, SLAB_CONFIG):
             count = int(slab_counts.get(cfg["slab"], 0))
+            pct = f"{count / total_count * 100:.0f}%" if total_count > 0 else "0%"
             color = cfg["color"]
             with col:
                 st.markdown(
                     f"""
-                    <div class="slab-card" style="border-left-color: {color};">
-                        <div class="slab-count" style="color: {color};">{count}</div>
-                        <div class="slab-label">{cfg['slab']} — {cfg['range']} pts</div>
-                        <div class="slab-gift">{cfg['gift']}</div>
+                    <div class="slab-card">
+                        <div class="slab-color-band" style="background: {color};"></div>
+                        <div class="slab-card-body">
+                            <div class="slab-count" style="color: {color};">
+                                {count}<span class="slab-pct">({pct})</span>
+                            </div>
+                            <div class="slab-label">{cfg['slab']} — {cfg['range']} pts</div>
+                            <div class="slab-gift">{cfg['gift']}</div>
+                        </div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
 
 
 def render_summary(df: pd.DataFrame) -> None:
@@ -704,11 +820,11 @@ def render_summary(df: pd.DataFrame) -> None:
             "Slab": cfg["slab"],
             "Points Range": cfg["range"],
             "Dealer Count": count,
-            "Total Volume": format_indian(vol, decimal=1),
-            "Qual. Shop Vol.": format_indian(shop_vol, decimal=1),
-            "Qual. Site Vol.": format_indian(site_vol, decimal=1),
-            "Qualified Volume": format_indian(qual_vol, decimal=1),
-            "Total Points": format_indian(pts, decimal=1),
+            "Total Volume": format_indian(vol, decimal=0),
+            "Qual. Shop Vol.": format_indian(shop_vol, decimal=0),
+            "Qual. Site Vol.": format_indian(site_vol, decimal=0),
+            "Qualified Volume": format_indian(qual_vol, decimal=0),
+            "Total Points": format_indian(pts, decimal=0),
             "Gift": cfg["gift_full"],
         })
 
@@ -716,11 +832,11 @@ def render_summary(df: pd.DataFrame) -> None:
         "Slab": "TOTAL",
         "Points Range": "",
         "Dealer Count": grand_count,
-        "Total Volume": format_indian(grand_vol, decimal=1),
-        "Qual. Shop Vol.": format_indian(grand_shop_vol, decimal=1),
-        "Qual. Site Vol.": format_indian(grand_site_vol, decimal=1),
-        "Qualified Volume": format_indian(grand_qual_vol, decimal=1),
-        "Total Points": format_indian(grand_pts, decimal=1),
+        "Total Volume": format_indian(grand_vol, decimal=0),
+        "Qual. Shop Vol.": format_indian(grand_shop_vol, decimal=0),
+        "Qual. Site Vol.": format_indian(grand_site_vol, decimal=0),
+        "Qualified Volume": format_indian(grand_qual_vol, decimal=0),
+        "Total Points": format_indian(grand_pts, decimal=0),
         "Gift": "",
     })
 
@@ -912,7 +1028,334 @@ def render_dealer_details(df: pd.DataFrame) -> None:
 
 
 # ============================================================================
-# SECTION 8 — MAIN
+# SECTION 8 — TAB: NEAR-UPGRADE ANALYSIS
+# ============================================================================
+
+def render_near_upgrade(df: pd.DataFrame) -> None:
+    """Render the Near-Upgrade Analysis tab showing dealers close to next slab.
+
+    Displays dealers within a configurable points threshold of upgrading,
+    sorted by points remaining (ascending) so the sales team can prioritize.
+
+    Args:
+        df: Filtered DataFrame.
+    """
+    if df.empty:
+        st.info("No data matches the selected filters.")
+        return
+
+    # Only dealers with a next slab (exclude Slab E)
+    upgradable = df[df["Qualified Slab"] != SLAB_CONFIG[-1]["slab"]].copy()
+
+    if upgradable.empty:
+        st.info("All dealers are already at the highest slab.")
+        return
+
+    # Compute points gap
+    upgradable["Points Gap"] = upgradable.apply(
+        lambda row: points_to_next(row["Qualified Points"], row["Qualified Slab"]) or 0,
+        axis=1,
+    )
+
+    # --- Threshold selector ---
+    threshold = st.slider(
+        "Show dealers within N points of next slab",
+        min_value=100,
+        max_value=2000,
+        value=500,
+        step=100,
+        key="near_upgrade_threshold",
+    )
+
+    near = upgradable[upgradable["Points Gap"] <= threshold].copy()
+    near = near.sort_values("Points Gap", ascending=True)
+
+    # --- KPI row ---
+    total_near = len(near)
+    st.markdown(f'<div class="section-title">Dealers within {threshold} points of upgrade</div>',
+                unsafe_allow_html=True)
+
+    if total_near == 0:
+        st.info(f"No dealers are within {threshold} points of the next slab.")
+        return
+
+    # Breakdown by target slab
+    near["Target Slab"] = near["Qualified Slab"].apply(get_next_slab)
+    target_counts = near["Target Slab"].value_counts()
+
+    kpi_cols = st.columns(min(len(target_counts) + 1, 6))
+    with kpi_cols[0]:
+        st.markdown(
+            f"""
+            <div class="kpi-card">
+                <div class="kpi-label">Total Near-Upgrade</div>
+                <div class="kpi-value">{total_near}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    for i, (target, count) in enumerate(target_counts.items()):
+        if i + 1 >= len(kpi_cols):
+            break
+        color = SLAB_COLORS.get(target, "#64748b")
+        with kpi_cols[i + 1]:
+            st.markdown(
+                f"""
+                <div class="kpi-card" style="border-top-color: {color};">
+                    <div class="kpi-label">Near {target}</div>
+                    <div class="kpi-value" style="color: {color};">{count}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- Detail table ---
+    st.subheader(f"Near-Upgrade Dealers ({total_near} records)")
+
+    display_cols = [
+        c for c in [
+            "Dealer Name", "Distributor Name", "State", "Zone",
+            "Qualified Points", "Qualified Slab", "Target Slab", "Points Gap",
+            "Total Volume",
+        ]
+        if c in near.columns
+    ]
+
+    display_df = near[display_cols].copy()
+
+    # Rename for display
+    display_df = display_df.rename(columns={
+        "Target Slab": "Next Slab",
+        "Points Gap": "Pts to Upgrade",
+    })
+
+    # Round numerics to whole numbers
+    for col in ["Qualified Points", "Pts to Upgrade", "Total Volume"]:
+        if col in display_df.columns:
+            display_df[col] = pd.to_numeric(
+                display_df[col], errors="coerce"
+            ).fillna(0).round(0).astype(int)
+
+    def _highlight_urgency(row: pd.Series) -> list[str]:
+        """Color rows by upgrade urgency: green for close, yellow for moderate."""
+        pts = row.get("Pts to Upgrade", 999)
+        if pts <= 100:
+            return ["background-color: #d1fae5"] * len(row)
+        if pts <= 300:
+            return ["background-color: #fef3c7"] * len(row)
+        return ["background-color: #f1f5f9"] * len(row)
+
+    def _bold_key_cols(col: pd.Series) -> list[str]:
+        """Bold key columns."""
+        if col.name in ("Dealer Name", "Pts to Upgrade", "Next Slab"):
+            return ["font-weight: 700"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        display_df.style
+        .apply(_highlight_urgency, axis=1)
+        .apply(_bold_key_cols, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
+
+
+# ============================================================================
+# SECTION 9 — TAB: PERFORMANCE OVERVIEW (Distributor / Zone / State)
+# ============================================================================
+
+def _build_performance_table(
+    df: pd.DataFrame,
+    group_col: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Aggregate dealer metrics by a grouping column with slab distribution.
+
+    Args:
+        df: Source DataFrame.
+        group_col: Column to group by (e.g. "Distributor Name", "Zone", "State").
+
+    Returns:
+        Tuple of (aggregated DataFrame with Qual. Rate %, slab_mix DataFrame).
+    """
+    agg = df.groupby(group_col, as_index=False).agg(
+        Dealers=("Dealer Name", "count"),
+        Total_Volume=("Total Volume", "sum"),
+        Avg_Points=("Qualified Points", "mean"),
+        Total_Points=("Qualified Points", "sum"),
+        Shop_Volume=("Shop Volume", "sum"),
+        Site_Volume=("Site Volume", "sum"),
+    )
+    agg = agg[agg[group_col].str.strip() != ""]
+    agg = agg.sort_values("Dealers", ascending=False)
+
+    # Slab mix
+    valid = df[df[group_col].str.strip() != ""]
+    slab_mix = valid.groupby([group_col, "Qualified Slab"]).size().unstack(fill_value=0)
+    for slab_name in SLAB_ORDER:
+        if slab_name not in slab_mix.columns:
+            slab_mix[slab_name] = 0
+    slab_mix = slab_mix[SLAB_ORDER]
+
+    if "Unqualified" in slab_mix.columns:
+        slab_mix["Qualified Rate"] = (
+            slab_mix.drop(columns=["Unqualified"]).sum(axis=1)
+            / slab_mix.sum(axis=1)
+            * 100
+        )
+    else:
+        slab_mix["Qualified Rate"] = 100.0
+
+    agg = agg.merge(
+        slab_mix[["Qualified Rate"]],
+        left_on=group_col,
+        right_index=True,
+        how="left",
+    )
+
+    return agg, slab_mix
+
+
+def _render_performance_section(
+    agg_df: pd.DataFrame,
+    slab_mix: pd.DataFrame,
+    group_col: str,
+    title: str,
+    height: int = 400,
+) -> None:
+    """Render a styled performance table for a given grouping.
+
+    Args:
+        agg_df: Aggregated metrics DataFrame.
+        slab_mix: Slab distribution DataFrame.
+        group_col: Grouping column name.
+        title: Subheader title text.
+        height: Table height in pixels.
+    """
+    total_rows = len(agg_df)
+    st.subheader(f"{title} ({total_rows})")
+
+    display_df = agg_df.copy()
+    display_df = display_df.rename(columns={
+        "Total_Volume": "Total Volume",
+        "Avg_Points": "Avg Points",
+        "Total_Points": "Total Points",
+        "Shop_Volume": "Qual. Shop Vol.",
+        "Site_Volume": "Qual. Site Vol.",
+        "Qualified Rate": "Qual. Rate %",
+    })
+
+    # Add slab distribution columns
+    for slab_name in SLAB_ORDER:
+        if slab_name in slab_mix.columns:
+            display_df = display_df.merge(
+                slab_mix[[slab_name]],
+                left_on=group_col,
+                right_index=True,
+                how="left",
+            )
+
+    display_cols = [
+        c for c in [
+            group_col, "Dealers", "Total Volume",
+            "Qual. Shop Vol.", "Qual. Site Vol.",
+            "Avg Points", "Total Points", "Qual. Rate %",
+        ] + SLAB_ORDER
+        if c in display_df.columns
+    ]
+    display_df = display_df[display_cols]
+
+    # All numerics to whole numbers
+    int_cols = ["Dealers", "Total Volume", "Qual. Shop Vol.", "Qual. Site Vol.",
+                "Total Points", "Avg Points", "Qual. Rate %"] + SLAB_ORDER
+    for col in int_cols:
+        if col in display_df.columns:
+            display_df[col] = pd.to_numeric(
+                display_df[col], errors="coerce"
+            ).fillna(0).round(0).astype(int)
+
+    def _highlight_qual(row: pd.Series) -> list[str]:
+        rate = row.get("Qual. Rate %", 0)
+        if rate >= 60:
+            return ["background-color: #d1fae5"] * len(row)
+        if rate >= 30:
+            return ["background-color: #fef3c7"] * len(row)
+        return ["background-color: #fee2e2"] * len(row)
+
+    def _bold_key(col_series: pd.Series) -> list[str]:
+        if col_series.name in (group_col, "Dealers", "Qual. Rate %"):
+            return ["font-weight: 700"] * len(col_series)
+        return [""] * len(col_series)
+
+    styled = (
+        display_df.style
+        .apply(_highlight_qual, axis=1)
+        .apply(_bold_key, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True, height=height)
+
+
+def render_performance_overview(df: pd.DataFrame) -> None:
+    """Render the Performance Overview tab with Distributor, Zone, and State tables.
+
+    Args:
+        df: Filtered DataFrame.
+    """
+    if df.empty:
+        st.info("No data available for performance analysis.")
+        return
+
+    # --- KPI cards ---
+    st.markdown('<div class="section-title">Performance Overview</div>',
+                unsafe_allow_html=True)
+
+    dist_count = df["Distributor Name"].nunique() if "Distributor Name" in df.columns else 0
+    zone_count = df["Zone"][df["Zone"].str.strip() != ""].nunique() if "Zone" in df.columns else 0
+    state_count = df["State"][df["State"].str.strip() != ""].nunique() if "State" in df.columns else 0
+    total_dealers = len(df)
+
+    kpi_cols = st.columns(4)
+    kpis = [
+        ("Total Dealers", format_indian(total_dealers)),
+        ("Distributors", format_indian(dist_count)),
+        ("Zones", format_indian(zone_count)),
+        ("States", format_indian(state_count)),
+    ]
+    for col, (label, value) in zip(kpi_cols, kpis):
+        with col:
+            st.markdown(
+                f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- Zone-wise table ---
+    if "Zone" in df.columns:
+        zone_agg, zone_slab = _build_performance_table(df, "Zone")
+        _render_performance_section(zone_agg, zone_slab, "Zone", "Zone-wise Performance", height=200)
+        st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- State-wise table ---
+    if "State" in df.columns:
+        state_agg, state_slab = _build_performance_table(df, "State")
+        _render_performance_section(state_agg, state_slab, "State", "State-wise Performance")
+        st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- Distributor-wise table ---
+    if "Distributor Name" in df.columns:
+        dist_agg, dist_slab = _build_performance_table(df, "Distributor Name")
+        _render_performance_section(dist_agg, dist_slab, "Distributor Name", "Distributor-wise Performance")
+
+
+# ============================================================================
+# SECTION 10 — MAIN
 # ============================================================================
 
 def main() -> None:
@@ -929,8 +1372,11 @@ def main() -> None:
     st.markdown(
         """
         <div class="header-bar">
-            <h1>📊 Q4 Scheme Dashboard</h1>
-            <span>Slab Analysis & Dealer Tracker</span>
+            <h1>Q4 Scheme Dashboard</h1>
+            <div class="header-right">
+                <span class="header-subtitle">Slab Analysis & Dealer Tracker</span>
+                <span class="header-badge">Q4 FY 2024-25</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -944,16 +1390,23 @@ def main() -> None:
     st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter)")
 
     # --- Global Cascading Filters ---
+    st.markdown(
+        '<div class="filter-panel"><div class="filter-panel-title">&#9660; Filters</div>',
+        unsafe_allow_html=True,
+    )
     summary_filters = ["Qualified Slab", "Zone", "State", "District", "Distributor Name"]
     filtered_df = render_cascading_filters(df, key="global", filter_fields=summary_filters)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # --- Summary on top (filtered) ---
     render_summary_top(filtered_df)
 
     # --- Tabs ---
-    tab_summary, tab_details = st.tabs([
+    tab_summary, tab_details, tab_upgrade, tab_performance = st.tabs([
         "📊 Summary",
         "🔍 Dealer Details",
+        "🎯 Near-Upgrade",
+        "📈 Performance Overview",
     ])
 
     with tab_summary:
@@ -961,6 +1414,12 @@ def main() -> None:
 
     with tab_details:
         render_dealer_details(filtered_df)
+
+    with tab_upgrade:
+        render_near_upgrade(filtered_df)
+
+    with tab_performance:
+        render_performance_overview(filtered_df)
 
 
 if __name__ == "__main__":

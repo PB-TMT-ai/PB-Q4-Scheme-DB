@@ -86,3 +86,16 @@ class TestDataLoading:
         output_path = generate_report(df)
         assert output_path.exists()
         assert output_path.suffix == ".xlsx"
+
+    def test_report_has_all_sheets(self, has_data_file: bool) -> None:
+        """Verify report contains all four expected sheets."""
+        from openpyxl import load_workbook
+        from scripts.generate_slab_report import generate_report, load_data
+        df = load_data()
+        output_path = generate_report(df)
+        wb = load_workbook(str(output_path))
+        expected = {
+            "Slab Summary", "Dealer Detail", "Near-Upgrade",
+            "Zone Performance", "State Performance", "Distributor Performance",
+        }
+        assert expected == set(wb.sheetnames)

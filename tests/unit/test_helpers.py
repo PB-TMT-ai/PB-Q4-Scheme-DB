@@ -167,7 +167,7 @@ class TestSlabConfig:
 
     def test_all_required_keys(self) -> None:
         required = {"slab", "slab_code", "range", "lower", "upper", "gift",
-                     "gift_full", "category", "color", "color_light"}
+                     "gift_full", "category", "volume_mt", "color", "color_light"}
         for cfg in SLAB_CONFIG:
             assert required.issubset(cfg.keys()), f"Missing keys in {cfg['slab']}"
 
