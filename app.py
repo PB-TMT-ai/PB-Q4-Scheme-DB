@@ -786,6 +786,30 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     detail_filters = ["Distributor Name", "State", "Dealer Name", "Qualified Slab"]
     filtered = render_cascading_filters(df, key="dealer_detail", filter_fields=detail_filters)
 
+    # --- Vol. to Achieve range filter ---
+    _temp_vol = filtered.apply(
+        lambda row: _calc_vol_to_achieve(
+            row.get("Qualified Slab", ""),
+            row.get("Total Volume", 0),
+        ),
+        axis=1,
+    )
+    _vol_options = ["All", "0 - 20 MT", "21 - 40 MT", "41 - 60 MT", "61 - 100 MT", "More than 100 MT"]
+    _vol_col, _ = st.columns([1, 3])
+    with _vol_col:
+        _vol_sel = st.selectbox("Vol. to Achieve", _vol_options, key="dealer_detail_vol_achieve")
+
+    if _vol_sel != "All":
+        _range_map: dict[str, tuple[float, float]] = {
+            "0 - 20 MT": (0, 20),
+            "21 - 40 MT": (21, 40),
+            "41 - 60 MT": (41, 60),
+            "61 - 100 MT": (61, 100),
+            "More than 100 MT": (101, float("inf")),
+        }
+        _lo, _hi = _range_map[_vol_sel]
+        filtered = filtered[(_temp_vol >= _lo) & (_temp_vol <= _hi)]
+
     if filtered.empty:
         st.info("No data matches the selected filters.")
         return
