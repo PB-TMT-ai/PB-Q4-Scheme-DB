@@ -26,8 +26,15 @@ cascading filters, and Plotly visualizations.
 - **SLAB_CONFIG** is single source of truth for all tier definitions
 - All slab-derived dicts are computed from SLAB_CONFIG, never hardcoded separately
 - Cascading filters reuse `render_cascading_filters()` with unique key prefixes per tab
+- Extra filters (e.g. Vol. to Achieve) should be rendered **inline** in the same `st.columns()` row as cascading filters, not in a separate row
 - Indian number formatting (`format_indian`) for all displayed values
 - `@st.cache_data` on all data-loading functions
+
+## Deployment
+- Hosted on **Streamlit Cloud**
+- Deployment branch: `claude/dealer-slab-color-coding-dFor3` (verify in Streamlit Cloud settings)
+- Always confirm the deployment branch before pushing fixes
+- The GitHub default branch may differ from the Streamlit Cloud deployment branch
 
 ## Error Protocol
 1. Log the error via `src/lib/logger.py`
