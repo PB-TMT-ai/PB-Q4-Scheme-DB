@@ -18,6 +18,7 @@ Add or modify entries in the `SLAB_CONFIG` list. Each entry requires:
 | gift        | str         | Short gift label                     |
 | gift_full   | str         | Full gift description                |
 | category    | str         | Grouping category                    |
+| volume_mt   | float       | Volume (MT) threshold for this slab  |
 | color       | str         | Hex color for UI elements            |
 | color_light | str         | Light hex color for table row backgrounds |
 
@@ -26,7 +27,7 @@ Add or modify entries in the `SLAB_CONFIG` list. Each entry requires:
 - **Last slab** must have `upper: float("inf")`
 - **First slab** must have `lower: 0`
 - **Colors** should be visually distinct
-- All derived dicts (SLAB_GIFT_MAP, SLAB_COLORS, SLAB_COLORS_LIGHT, SLAB_CODE_MAP, etc.) auto-update
+- All derived dicts (SLAB_GIFT_MAP, SLAB_COLORS, SLAB_COLORS_LIGHT, SLAB_CODE_MAP, NEXT_SLAB_VOLUME, etc.) auto-update
 
 ### 3. Mirror in Scripts
 Update `SLAB_CONFIG` in `scripts/generate_slab_report.py` to match.

@@ -40,10 +40,28 @@ with tab_new:
 
 ### 3. Key Rules
 - Use a unique `key` prefix for `render_cascading_filters` (e.g. `"new_tab"`)
+- **Inline extra filters**: If adding filters beyond the standard cascading set (e.g. Vol. to Achieve range), render them in the **same `st.columns()` row** — never in a separate row, as narrow/separate rows can be invisible to users
 - Always handle empty state with `st.info()` + early return
 - Use `format_indian()` for all displayed numbers
 - Use Plotly `graph_objects` for charts (not `plotly.express`)
 - Follow the CSS design system (`.kpi-card`, `.slab-card` classes)
+
+#### Inline Extra Filter Example (Dealer Details pattern)
+```python
+detail_filters = ["Distributor Name", "State", "Dealer Name", "Qualified Slab"]
+_all_cols = st.columns(len(detail_filters) + 1)  # +1 for extra filter
+filtered = df.copy()
+
+for i, field in enumerate(detail_filters):
+    with _all_cols[i]:
+        options = _opts(filtered[field])
+        selected = st.selectbox(field, options, key=f"my_tab_{field}")
+        if selected != "All":
+            filtered = filtered[filtered[field] == selected]
+
+with _all_cols[-1]:
+    extra_sel = st.selectbox("Extra Filter", extra_options, key="my_tab_extra")
+```
 
 ### 4. Available Data Columns
 The DataFrame includes these standard columns (mapped from Excel):
@@ -51,9 +69,22 @@ The DataFrame includes these standard columns (mapped from Excel):
 - `Shop Volume` (Qual. Shop Vol.), `Site Volume` (Qual. Site Vol.)
 - `Total Volume`, `Qualified Volume`
 - `Qualified Points`, `Qualified Slab`, `Q4 Volume`
-- `Next Upgrade Slab` (Next Slab), `Points to Next Slab` (Volume to Qualify)
+- `Next Upgrade Slab` (Next Slab)
+- Vol. to Achieve is computed at display time from `NEXT_SLAB_VOLUME`
 
-### 5. Test
+**Note:** Global cascading filters (Slab, Zone, State, District, Distributor)
+are applied before tabs. New tab renderers receive the pre-filtered DataFrame.
+Use a unique `key` prefix only for any additional tab-specific filters.
+
+### 5. Existing Tabs (for reference)
+| Section | Tab | Renderer | Key |
+|---------|-----|----------|-----|
+| 6 | Summary | `render_summary_top` + `render_summary` | `global` |
+| 7 | Dealer Details | `render_dealer_details` | `dealer_detail` |
+| 8 | Near-Upgrade | `render_near_upgrade` | `near_upgrade_threshold` |
+| 9 | Performance Overview | `render_performance_overview` | — |
+
+### 6. Test
 - Verify filters cascade correctly
 - Verify empty state displays info message
 - Verify charts render with data
