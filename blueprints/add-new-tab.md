@@ -40,10 +40,28 @@ with tab_new:
 
 ### 3. Key Rules
 - Use a unique `key` prefix for `render_cascading_filters` (e.g. `"new_tab"`)
+- **Inline extra filters**: If adding filters beyond the standard cascading set (e.g. Vol. to Achieve range), render them in the **same `st.columns()` row** — never in a separate row, as narrow/separate rows can be invisible to users
 - Always handle empty state with `st.info()` + early return
 - Use `format_indian()` for all displayed numbers
 - Use Plotly `graph_objects` for charts (not `plotly.express`)
 - Follow the CSS design system (`.kpi-card`, `.slab-card` classes)
+
+#### Inline Extra Filter Example (Dealer Details pattern)
+```python
+detail_filters = ["Distributor Name", "State", "Dealer Name", "Qualified Slab"]
+_all_cols = st.columns(len(detail_filters) + 1)  # +1 for extra filter
+filtered = df.copy()
+
+for i, field in enumerate(detail_filters):
+    with _all_cols[i]:
+        options = _opts(filtered[field])
+        selected = st.selectbox(field, options, key=f"my_tab_{field}")
+        if selected != "All":
+            filtered = filtered[filtered[field] == selected]
+
+with _all_cols[-1]:
+    extra_sel = st.selectbox("Extra Filter", extra_options, key="my_tab_extra")
+```
 
 ### 4. Available Data Columns
 The DataFrame includes these standard columns (mapped from Excel):
