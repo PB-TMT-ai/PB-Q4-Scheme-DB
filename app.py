@@ -899,8 +899,43 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     Args:
         df: Full DataFrame.
     """
+    # --- All 5 filters in one row: 4 cascading + Vol. to Achieve ---
     detail_filters = ["Distributor Name", "State", "Dealer Name", "Qualified Slab"]
-    filtered = render_cascading_filters(df, key="dealer_detail", filter_fields=detail_filters)
+    _all_cols = st.columns(len(detail_filters) + 1)
+    filtered = df.copy()
+
+    for i, field in enumerate(detail_filters):
+        with _all_cols[i]:
+            options = _opts(filtered[field])
+            selected = st.selectbox(
+                field,
+                options,
+                key=f"dealer_detail_{field}",
+            )
+            if selected != "All":
+                filtered = filtered[filtered[field] == selected]
+
+    _vol_options = ["All", "0 - 20 MT", "21 - 40 MT", "41 - 60 MT", "61 - 100 MT", "More than 100 MT"]
+    with _all_cols[-1]:
+        _vol_sel = st.selectbox("Vol. to Achieve", _vol_options, key="dealer_detail_vol_achieve")
+
+    if _vol_sel != "All":
+        _temp_vol = filtered.apply(
+            lambda row: _calc_vol_to_achieve(
+                row.get("Qualified Slab", ""),
+                row.get("Total Volume", 0),
+            ),
+            axis=1,
+        )
+        _range_map: dict[str, tuple[float, float]] = {
+            "0 - 20 MT": (0, 20),
+            "21 - 40 MT": (21, 40),
+            "41 - 60 MT": (41, 60),
+            "61 - 100 MT": (61, 100),
+            "More than 100 MT": (101, float("inf")),
+        }
+        _lo, _hi = _range_map[_vol_sel]
+        filtered = filtered[(_temp_vol >= _lo) & (_temp_vol <= _hi)]
 
     if filtered.empty:
         st.info("No data matches the selected filters.")
