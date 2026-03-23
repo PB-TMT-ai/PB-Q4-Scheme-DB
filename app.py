@@ -338,6 +338,15 @@ def inject_custom_css() -> None:
             font-weight: 500;
             color: #94a3b8;
         }
+        .header-badge {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 1rem;
+            padding: 0.3rem 1rem;
+        }
 
         /* ── Section divider ── */
         .section-divider {
