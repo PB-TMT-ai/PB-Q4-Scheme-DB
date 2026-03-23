@@ -307,9 +307,13 @@ def inject_custom_css() -> None:
             color: #ffffff;
         }
         .header-bar span {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: #cbd5e1;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 1rem;
+            padding: 0.3rem 1rem;
         }
 
         /* Slab cards */
@@ -929,8 +933,8 @@ def main() -> None:
     st.markdown(
         """
         <div class="header-bar">
-            <h1>📊 Q4 Scheme Dashboard</h1>
-            <span>Slab Analysis & Dealer Tracker</span>
+            <h1>Slab Analysis & Dealer Tracker</h1>
+            <span>Q4 FY'26</span>
         </div>
         """,
         unsafe_allow_html=True,
