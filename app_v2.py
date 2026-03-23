@@ -1,8 +1,9 @@
 """
-Streamlit Dashboard — Q4 Scheme Slab Analysis (V2 — Minimalist Clean)
-=====================================================================
-Minimalist redesign of the Q4 Scheme Dashboard.
-Swiss-style design: clean whitespace, no shadows, thin borders, Inter font.
+Streamlit Dashboard — Q4 Scheme Slab Analysis (V2 — Bento Grid)
+================================================================
+Bento Grid redesign of the Q4 Scheme Dashboard.
+Apple-style modular cards: mixed sizes, rounded corners, soft shadows,
+Fira Sans/Code fonts, #F5F5F7 background, hover scale effects.
 Same data pipeline as app.py.
 
 Run: streamlit run app_v2.py
@@ -236,158 +237,174 @@ def points_to_next(points: float, current: str) -> Optional[float]:
 
 
 # ============================================================================
-# SECTION 3 — MINIMALIST CSS
+# SECTION 3 — BENTO GRID CSS
 # ============================================================================
 
-def inject_minimalist_css() -> None:
-    """Inject minimalist Swiss-style CSS into the Streamlit app."""
+def inject_bento_css() -> None:
+    """Inject Bento Grid (Apple-style) CSS into the Streamlit app."""
     st.markdown(
         """
         <style>
-        /* ── Google Fonts: Inter ── */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        /* ── Google Fonts: Fira Sans + Fira Code ── */
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
 
         /* ── Global Reset ── */
         html, body, [class*="css"] {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Fira Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .stApp {
+            background-color: #F5F5F7;
         }
 
         /* ── Header ── */
         .v2-header {
             display: flex;
             justify-content: space-between;
-            align-items: baseline;
-            padding: 1.5rem 0 1rem 0;
-            border-bottom: 1px solid #E5E7EB;
-            margin-bottom: 2rem;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            background: #FFFFFF;
+            border-radius: 20px;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .v2-header h1 {
             margin: 0;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #111111;
-            letter-spacing: -0.025em;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #1D1D1F;
+            letter-spacing: -0.02em;
         }
         .v2-header-right {
             display: flex;
             align-items: center;
-            gap: 1.25rem;
+            gap: 1rem;
         }
         .v2-header-subtitle {
             font-size: 0.8rem;
             font-weight: 400;
-            color: #6B7280;
-            letter-spacing: 0.02em;
+            color: #86868B;
         }
         .v2-header-badge {
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: #2563EB;
-            border: 1px solid #BFDBFE;
-            border-radius: 4px;
-            padding: 0.25rem 0.75rem;
-            letter-spacing: 0.03em;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #FFFFFF;
+            background: #1D1D1F;
+            border-radius: 100px;
+            padding: 0.3rem 0.9rem;
+            letter-spacing: 0.04em;
         }
 
-        /* ── KPI Metrics ── */
+        /* ── Bento Card Base ── */
+        .v2-bento-card {
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .v2-bento-card:hover {
+            transform: scale(1.01);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        /* ── KPI Metrics (inside bento cards) ── */
         .v2-kpi {
-            text-align: center;
-            padding: 1rem 0.5rem;
+            text-align: left;
+            padding: 0;
         }
         .v2-kpi-value {
-            font-size: 1.75rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 2rem;
             font-weight: 700;
-            color: #111111;
-            line-height: 1.2;
-            letter-spacing: -0.02em;
+            color: #1D1D1F;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
         }
         .v2-kpi-label {
-            font-size: 0.7rem;
+            font-size: 0.72rem;
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            color: #6B7280;
-            margin-top: 0.4rem;
-        }
-        .v2-kpi-divider {
-            border-bottom: 2px solid #2563EB;
-            width: 24px;
-            margin: 0.5rem auto 0;
+            color: #86868B;
+            margin-top: 0.5rem;
         }
 
-        /* ── Slab Cards ── */
+        /* ── Slab Cards (bento tiles) ── */
         .v2-slab {
-            padding: 1rem 0.75rem;
-            text-align: left;
-            border-right: 1px solid #F3F4F6;
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: default;
+            position: relative;
+            overflow: hidden;
         }
-        .v2-slab:last-child {
-            border-right: none;
+        .v2-slab:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
-        .v2-slab-dot {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 0.4rem;
-            vertical-align: middle;
+        .v2-slab-accent {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            border-radius: 20px 20px 0 0;
         }
         .v2-slab-count {
-            font-size: 1.75rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 2rem;
             font-weight: 700;
-            color: #111111;
-            line-height: 1.2;
-            letter-spacing: -0.02em;
+            color: #1D1D1F;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-top: 0.5rem;
         }
         .v2-slab-name {
-            font-size: 0.78rem;
-            font-weight: 500;
-            color: #374151;
-            margin-top: 0.25rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #1D1D1F;
+            margin-top: 0.4rem;
         }
         .v2-slab-range {
             font-size: 0.7rem;
             font-weight: 400;
-            color: #9CA3AF;
-            margin-top: 0.1rem;
+            color: #86868B;
+            margin-top: 0.15rem;
         }
         .v2-slab-gift {
             font-size: 0.7rem;
-            font-weight: 400;
-            color: #9CA3AF;
-            margin-top: 0.15rem;
+            font-weight: 500;
+            color: #86868B;
+            margin-top: 0.3rem;
+            padding-top: 0.3rem;
+            border-top: 1px solid #F5F5F7;
         }
 
         /* ── Section Headers ── */
         .v2-section-title {
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 600;
-            color: #111111;
+            color: #1D1D1F;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            margin: 2rem 0 1rem 0;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #E5E7EB;
+            margin: 0.5rem 0 1rem 0;
+            padding: 0;
         }
 
-        /* ── Separator ── */
-        .v2-separator {
-            border: none;
-            border-top: 1px solid #F3F4F6;
-            margin: 1.5rem 0;
-        }
-
-        /* ── Tables — Minimal ── */
+        /* ── Tables inside bento cards ── */
         .stDataFrame [data-testid="stDataFrameResizable"] {
-            border: 1px solid #E5E7EB;
-            border-radius: 4px;
+            border: none;
+            border-radius: 12px;
+            overflow: hidden;
         }
         .stDataFrame thead tr th {
-            background-color: #F9FAFB !important;
-            color: #111111 !important;
+            background-color: #F5F5F7 !important;
+            color: #1D1D1F !important;
             font-weight: 600 !important;
-            font-size: 0.8rem !important;
-            border-bottom: 1px solid #E5E7EB !important;
+            font-size: 0.78rem !important;
+            border-bottom: none !important;
         }
         [data-testid="stDataFrame"] [role="columnheader"],
         [data-testid="stDataFrame"] [data-testid="glide-cell"] {
@@ -400,50 +417,56 @@ def inject_minimalist_css() -> None:
             background-color: #FFFFFF !important;
         }
         .stDataFrame tbody tr:hover {
-            background-color: #F9FAFB !important;
+            background-color: #F9F9FB !important;
         }
 
-        /* ── Tabs — Clean underline ── */
+        /* ── Tabs — Pill style ── */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 0;
-            border-bottom: 1px solid #E5E7EB;
+            gap: 0.5rem;
+            border-bottom: none;
+            background: #FFFFFF;
+            border-radius: 14px;
+            padding: 0.3rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .stTabs [data-baseweb="tab"] {
-            padding: 0.6rem 1.5rem;
-            font-size: 0.82rem;
+            padding: 0.5rem 1.25rem;
+            font-size: 0.8rem;
             font-weight: 500;
-            color: #6B7280;
-            letter-spacing: 0.02em;
+            color: #86868B;
+            border-radius: 10px;
+            border-bottom: none;
         }
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
             font-weight: 600;
-            color: #111111;
-            border-bottom: 2px solid #2563EB;
+            color: #1D1D1F;
+            background: #F5F5F7;
+            border-bottom: none;
         }
 
-        /* ── Filters — Simplified ── */
+        /* ── Filters ── */
         .stSelectbox label {
             font-weight: 500 !important;
-            color: #374151 !important;
-            font-size: 0.78rem !important;
+            color: #1D1D1F !important;
+            font-size: 0.76rem !important;
             letter-spacing: 0.02em !important;
         }
         .stSelectbox [data-baseweb="select"] {
-            border-color: #E5E7EB !important;
+            border-color: #E8E8ED !important;
+            border-radius: 12px !important;
         }
 
         /* ── Subheaders ── */
         .stSubheader, h3, h2 {
-            color: #111111 !important;
+            color: #1D1D1F !important;
             font-weight: 600 !important;
-            letter-spacing: -0.01em !important;
         }
 
         /* ── File caption ── */
         .v2-caption {
-            font-size: 0.72rem;
-            color: #9CA3AF;
-            margin-bottom: 1.5rem;
+            font-size: 0.7rem;
+            color: #86868B;
+            margin-bottom: 1rem;
         }
 
         /* ── Hide Streamlit chrome ── */
@@ -590,7 +613,7 @@ def render_cascading_filters(
 # ============================================================================
 
 def render_kpi_row(df: pd.DataFrame) -> None:
-    """Render the top KPI metrics in minimalist style."""
+    """Render the top KPI metrics as bento grid cards."""
     total_dealers = len(df)
     total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
     total_shop_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
@@ -598,31 +621,89 @@ def render_kpi_row(df: pd.DataFrame) -> None:
     total_qual_vol = df["Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
     total_points = df["Qualified Points"].sum() if "Qualified Points" in df.columns else 0
 
-    kpi_cols = st.columns(6)
-    kpis = [
-        ("Total Dealers", format_indian(total_dealers)),
-        ("Total Volume (MT)", format_indian(total_volume, decimal=1)),
-        ("Qual. Shop Vol. (MT)", format_indian(total_shop_vol, decimal=1)),
-        ("Qual. Site Vol. (MT)", format_indian(total_site_vol, decimal=1)),
-        ("Qualified Volume (MT)", format_indian(total_qual_vol, decimal=1)),
-        ("Total Qualified Points", format_indian(total_points, decimal=1)),
-    ]
-    for col, (label, value) in zip(kpi_cols, kpis):
-        with col:
-            st.markdown(
-                f"""
+    # Row 1: 2-wide hero card + 2 standard cards
+    r1c1, r1c2, r1c3 = st.columns([2, 1, 1])
+    with r1c1:
+        st.markdown(
+            f"""
+            <div class="v2-bento-card">
                 <div class="v2-kpi">
-                    <div class="v2-kpi-value">{value}</div>
-                    <div class="v2-kpi-label">{label}</div>
-                    <div class="v2-kpi-divider"></div>
+                    <div class="v2-kpi-value">{format_indian(total_dealers)}</div>
+                    <div class="v2-kpi-label">Total Dealers</div>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with r1c2:
+        st.markdown(
+            f"""
+            <div class="v2-bento-card">
+                <div class="v2-kpi">
+                    <div class="v2-kpi-value">{format_indian(total_volume, decimal=1)}</div>
+                    <div class="v2-kpi-label">Total Volume (MT)</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with r1c3:
+        st.markdown(
+            f"""
+            <div class="v2-bento-card">
+                <div class="v2-kpi">
+                    <div class="v2-kpi-value">{format_indian(total_points, decimal=1)}</div>
+                    <div class="v2-kpi-label">Total Qualified Points</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
+
+    # Row 2: 3 equal cards
+    r2c1, r2c2, r2c3 = st.columns(3)
+    with r2c1:
+        st.markdown(
+            f"""
+            <div class="v2-bento-card">
+                <div class="v2-kpi">
+                    <div class="v2-kpi-value">{format_indian(total_shop_vol, decimal=1)}</div>
+                    <div class="v2-kpi-label">Qual. Shop Vol. (MT)</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with r2c2:
+        st.markdown(
+            f"""
+            <div class="v2-bento-card">
+                <div class="v2-kpi">
+                    <div class="v2-kpi-value">{format_indian(total_site_vol, decimal=1)}</div>
+                    <div class="v2-kpi-label">Qual. Site Vol. (MT)</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with r2c3:
+        st.markdown(
+            f"""
+            <div class="v2-bento-card">
+                <div class="v2-kpi">
+                    <div class="v2-kpi-value">{format_indian(total_qual_vol, decimal=1)}</div>
+                    <div class="v2-kpi-label">Qualified Volume (MT)</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def render_slab_cards(df: pd.DataFrame) -> None:
-    """Render slab distribution cards in minimalist style."""
+    """Render slab distribution as bento grid tiles with colored accent bars."""
     if "Qualified Slab" not in df.columns:
         return
 
@@ -635,11 +716,9 @@ def render_slab_cards(df: pd.DataFrame) -> None:
             st.markdown(
                 f"""
                 <div class="v2-slab">
+                    <div class="v2-slab-accent" style="background-color: {color};"></div>
                     <div class="v2-slab-count">{count}</div>
-                    <div class="v2-slab-name">
-                        <span class="v2-slab-dot" style="background-color: {color};"></span>
-                        {cfg['slab']}
-                    </div>
+                    <div class="v2-slab-name">{cfg['slab']}</div>
                     <div class="v2-slab-range">{cfg['range']} pts</div>
                     <div class="v2-slab-gift">{cfg['gift']}</div>
                 </div>
@@ -868,7 +947,7 @@ def main() -> None:
         page_icon="Q4",
     )
 
-    inject_minimalist_css()
+    inject_bento_css()
 
     # --- Header ---
     st.markdown(
@@ -898,17 +977,15 @@ def main() -> None:
     summary_filters = ["Qualified Slab", "Zone", "State", "District", "Distributor Name"]
     filtered_df = render_cascading_filters(df, key="v2_global", filter_fields=summary_filters)
 
-    # --- KPI Row ---
+    # --- KPI Bento Grid ---
     render_kpi_row(filtered_df)
 
-    # --- Separator ---
-    st.markdown('<hr class="v2-separator">', unsafe_allow_html=True)
+    st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
 
-    # --- Slab Distribution ---
+    # --- Slab Distribution Tiles ---
     render_slab_cards(filtered_df)
 
-    # --- Separator ---
-    st.markdown('<hr class="v2-separator">', unsafe_allow_html=True)
+    st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
 
     # --- Tabs ---
     tab_summary, tab_details = st.tabs([
