@@ -338,6 +338,15 @@ def inject_custom_css() -> None:
             font-weight: 500;
             color: #94a3b8;
         }
+        .header-badge {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 1rem;
+            padding: 0.3rem 1rem;
+        }
 
         /* ── Section divider ── */
         .section-divider {
@@ -1375,7 +1384,7 @@ def main() -> None:
             <h1>Q4 Scheme Dashboard</h1>
             <div class="header-right">
                 <span class="header-subtitle">Slab Analysis & Dealer Tracker</span>
-                <span class="header-badge">Q4 FY 2024-25</span>
+                <span class="header-badge">Q4 FY 26</span>
             </div>
         </div>
         """,

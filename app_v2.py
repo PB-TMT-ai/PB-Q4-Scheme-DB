@@ -1,0 +1,927 @@
+"""
+Streamlit Dashboard — Q4 Scheme Slab Analysis (V2 — Minimalist Clean)
+=====================================================================
+Minimalist redesign of the Q4 Scheme Dashboard.
+Swiss-style design: clean whitespace, no shadows, thin borders, Inter font.
+Same data pipeline as app.py.
+
+Run: streamlit run app_v2.py
+"""
+
+from __future__ import annotations
+
+import glob
+import os
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+import streamlit as st
+
+from src.lib.logger import error as log_error
+from src.lib.logger import info as log_info
+
+# ============================================================================
+# SECTION 1 — CONSTANTS
+# ============================================================================
+
+DATA_DIR: str = "data"
+SHEET_NAME: str = "Sheet1"
+HEADER_ROW: int = 0
+
+COLUMN_MAP: dict[str, str] = {
+    "Retailer Name": "Dealer Name",
+    "State Name": "State",
+    "District Name": "District",
+    "Shop vol.": "Shop Volume",
+    "Site vol.": "Site Volume",
+    "Total vol. under scheme": "Qualified Volume",
+    "Total site vol.": "Total Site Volume",
+    "Points": "Qualified Points",
+    "Current gift": "Gift",
+    "Current gift slab": "Current Slab",
+    "Distributor self-counter (Yes/No)": "Self Counter",
+    "Jan + Feb+Mar": "Q4 Volume",
+    "# Unique Site >200 MT": "Unique Site >200 MT",
+}
+
+
+def _find_excel_file() -> Path:
+    """Locate the most recently modified Excel file in DATA_DIR."""
+    pattern = str(Path(DATA_DIR) / "*.xlsx")
+    files = glob.glob(pattern)
+    if not files:
+        st.error(f"No .xlsx files found in `{DATA_DIR}/`. Please add your data file.")
+        log_error(f"No Excel files in {DATA_DIR}/")
+        st.stop()
+    latest = max(files, key=os.path.getmtime)
+    log_info(f"Using data file: {latest}")
+    return Path(latest)
+
+
+# ---------------------------------------------------------------------------
+# SLAB_CONFIG — Single source of truth for all tier definitions
+# ---------------------------------------------------------------------------
+
+SLAB_CONFIG: list[dict] = [
+    {
+        "slab": "Unqualified",
+        "slab_code": "-",
+        "range": "0 – 749",
+        "lower": 0,
+        "upper": 750,
+        "gift": "No Gift",
+        "gift_full": "No Gift",
+        "category": "Unqualified",
+        "volume_mt": 0,
+        "color": "#94a3b8",
+        "color_light": "#f1f5f9",
+    },
+    {
+        "slab": "Slab A",
+        "slab_code": "A",
+        "range": "750 – 2,999",
+        "lower": 750,
+        "upper": 3000,
+        "gift": "Foot Massager",
+        "gift_full": "Foot massager",
+        "category": "A",
+        "volume_mt": 30,
+        "color": "#f59e0b",
+        "color_light": "#fef3c7",
+    },
+    {
+        "slab": "Slab B",
+        "slab_code": "B",
+        "range": "3,000 – 4,199",
+        "lower": 3000,
+        "upper": 4200,
+        "gift": "Sony Sound Bar",
+        "gift_full": "Sony - Sound bar, woofer and speakers",
+        "category": "B",
+        "volume_mt": 120,
+        "color": "#6366f1",
+        "color_light": "#e0e7ff",
+    },
+    {
+        "slab": "Slab C",
+        "slab_code": "C",
+        "range": "4,200 – 6,799",
+        "lower": 4200,
+        "upper": 6800,
+        "gift": "Robot Vacuum",
+        "gift_full": "Robot Vacuum cleaner",
+        "category": "C",
+        "volume_mt": 168,
+        "color": "#10b981",
+        "color_light": "#d1fae5",
+    },
+    {
+        "slab": "Slab D",
+        "slab_code": "D",
+        "range": "6,800 – 7,499",
+        "lower": 6800,
+        "upper": 7500,
+        "gift": "Apple iPad",
+        "gift_full": "Apple iPad",
+        "category": "D",
+        "volume_mt": 272,
+        "color": "#3b82f6",
+        "color_light": "#dbeafe",
+    },
+    {
+        "slab": "Slab E",
+        "slab_code": "E",
+        "range": "7,500+",
+        "lower": 7500,
+        "upper": float("inf"),
+        "gift": "Washing Machine",
+        "gift_full": "Samsung front-load washing machine",
+        "category": "E",
+        "volume_mt": 300,
+        "color": "#ec4899",
+        "color_light": "#fce7f3",
+    },
+]
+
+# Derived lookup dictionaries — all computed from SLAB_CONFIG
+SLAB_GIFT_MAP: dict[str, str] = {s["slab"]: s["gift_full"] for s in SLAB_CONFIG}
+SLAB_COLORS: dict[str, str] = {s["slab"]: s["color"] for s in SLAB_CONFIG}
+SLAB_COLORS_LIGHT: dict[str, str] = {s["slab"]: s["color_light"] for s in SLAB_CONFIG}
+SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
+
+SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
+
+NEXT_SLAB_MAP: dict[str, Optional[str]] = {}
+for _i, _cfg in enumerate(SLAB_CONFIG):
+    NEXT_SLAB_MAP[_cfg["slab"]] = (
+        SLAB_CONFIG[_i + 1]["slab"] if _i + 1 < len(SLAB_CONFIG) else None
+    )
+
+NEXT_SLAB_THRESHOLD: dict[str, Optional[float]] = {}
+for _i, _cfg in enumerate(SLAB_CONFIG):
+    NEXT_SLAB_THRESHOLD[_cfg["slab"]] = (
+        SLAB_CONFIG[_i + 1]["lower"] if _i + 1 < len(SLAB_CONFIG) else None
+    )
+
+NEXT_SLAB_VOLUME: dict[str, Optional[float]] = {}
+for _i, _cfg in enumerate(SLAB_CONFIG):
+    NEXT_SLAB_VOLUME[_cfg["slab"]] = (
+        SLAB_CONFIG[_i + 1]["volume_mt"] if _i + 1 < len(SLAB_CONFIG) else None
+    )
+
+
+# ============================================================================
+# SECTION 2 — HELPER FUNCTIONS
+# ============================================================================
+
+def format_indian(number: float, prefix: str = "", decimal: int = 0) -> str:
+    """Format a number with Indian comma grouping (e.g. 12,34,567)."""
+    if pd.isna(number):
+        return f"{prefix}0"
+    number = round(float(number), decimal)
+    is_negative = number < 0
+    number = abs(number)
+
+    if decimal > 0:
+        int_part, dec_part = f"{number:.{decimal}f}".split(".")
+    else:
+        int_part = str(int(number))
+        dec_part = ""
+
+    if len(int_part) <= 3:
+        formatted = int_part
+    else:
+        last3 = int_part[-3:]
+        remaining = int_part[:-3]
+        groups = []
+        while remaining:
+            groups.append(remaining[-2:])
+            remaining = remaining[:-2]
+        groups.reverse()
+        formatted = ",".join(groups) + "," + last3
+
+    result = f"{prefix}{formatted}"
+    if dec_part:
+        result += f".{dec_part}"
+    if is_negative:
+        result = f"-{result}"
+    return result
+
+
+def assign_slab(points: float) -> str:
+    """Assign a slab label based on qualified points using SLAB_CONFIG."""
+    if pd.isna(points):
+        points = 0.0
+    points = float(points)
+    for cfg in SLAB_CONFIG:
+        if cfg["lower"] <= points < cfg["upper"]:
+            return cfg["slab"]
+    return SLAB_CONFIG[0]["slab"]
+
+
+def get_next_slab(current: str) -> Optional[str]:
+    """Look up the next higher slab from NEXT_SLAB_MAP."""
+    return NEXT_SLAB_MAP.get(current)
+
+
+def points_to_next(points: float, current: str) -> Optional[float]:
+    """Calculate the points gap to reach the next slab tier."""
+    threshold = NEXT_SLAB_THRESHOLD.get(current)
+    if threshold is None:
+        return None
+    gap = threshold - float(points)
+    return max(gap, 0.0)
+
+
+# ============================================================================
+# SECTION 3 — MINIMALIST CSS
+# ============================================================================
+
+def inject_minimalist_css() -> None:
+    """Inject minimalist Swiss-style CSS into the Streamlit app."""
+    st.markdown(
+        """
+        <style>
+        /* ── Google Fonts: Inter ── */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        /* ── Global Reset ── */
+        html, body, [class*="css"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* ── Header ── */
+        .v2-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 1.5rem 0 1rem 0;
+            border-bottom: 1px solid #E5E7EB;
+            margin-bottom: 2rem;
+        }
+        .v2-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #111111;
+            letter-spacing: -0.025em;
+        }
+        .v2-header-right {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+        .v2-header-subtitle {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: #6B7280;
+            letter-spacing: 0.02em;
+        }
+        .v2-header-badge {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #2563EB;
+            border: 1px solid #BFDBFE;
+            border-radius: 4px;
+            padding: 0.25rem 0.75rem;
+            letter-spacing: 0.03em;
+        }
+
+        /* ── KPI Metrics ── */
+        .v2-kpi {
+            text-align: center;
+            padding: 1rem 0.5rem;
+        }
+        .v2-kpi-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #111111;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+        .v2-kpi-label {
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6B7280;
+            margin-top: 0.4rem;
+        }
+        .v2-kpi-divider {
+            border-bottom: 2px solid #2563EB;
+            width: 24px;
+            margin: 0.5rem auto 0;
+        }
+
+        /* ── Slab Cards ── */
+        .v2-slab {
+            padding: 1rem 0.75rem;
+            text-align: left;
+            border-right: 1px solid #F3F4F6;
+        }
+        .v2-slab:last-child {
+            border-right: none;
+        }
+        .v2-slab-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.4rem;
+            vertical-align: middle;
+        }
+        .v2-slab-count {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #111111;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+        .v2-slab-name {
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: #374151;
+            margin-top: 0.25rem;
+        }
+        .v2-slab-range {
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: #9CA3AF;
+            margin-top: 0.1rem;
+        }
+        .v2-slab-gift {
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: #9CA3AF;
+            margin-top: 0.15rem;
+        }
+
+        /* ── Section Headers ── */
+        .v2-section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #111111;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #E5E7EB;
+        }
+
+        /* ── Separator ── */
+        .v2-separator {
+            border: none;
+            border-top: 1px solid #F3F4F6;
+            margin: 1.5rem 0;
+        }
+
+        /* ── Tables — Minimal ── */
+        .stDataFrame [data-testid="stDataFrameResizable"] {
+            border: 1px solid #E5E7EB;
+            border-radius: 4px;
+        }
+        .stDataFrame thead tr th {
+            background-color: #F9FAFB !important;
+            color: #111111 !important;
+            font-weight: 600 !important;
+            font-size: 0.8rem !important;
+            border-bottom: 1px solid #E5E7EB !important;
+        }
+        [data-testid="stDataFrame"] [role="columnheader"],
+        [data-testid="stDataFrame"] [data-testid="glide-cell"] {
+            font-weight: 600 !important;
+        }
+        [data-testid="stDataFrame"] .gdg-header {
+            font-weight: 600 !important;
+        }
+        .stDataFrame tbody tr {
+            background-color: #FFFFFF !important;
+        }
+        .stDataFrame tbody tr:hover {
+            background-color: #F9FAFB !important;
+        }
+
+        /* ── Tabs — Clean underline ── */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0;
+            border-bottom: 1px solid #E5E7EB;
+        }
+        .stTabs [data-baseweb="tab"] {
+            padding: 0.6rem 1.5rem;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: #6B7280;
+            letter-spacing: 0.02em;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            font-weight: 600;
+            color: #111111;
+            border-bottom: 2px solid #2563EB;
+        }
+
+        /* ── Filters — Simplified ── */
+        .stSelectbox label {
+            font-weight: 500 !important;
+            color: #374151 !important;
+            font-size: 0.78rem !important;
+            letter-spacing: 0.02em !important;
+        }
+        .stSelectbox [data-baseweb="select"] {
+            border-color: #E5E7EB !important;
+        }
+
+        /* ── Subheaders ── */
+        .stSubheader, h3, h2 {
+            color: #111111 !important;
+            font-weight: 600 !important;
+            letter-spacing: -0.01em !important;
+        }
+
+        /* ── File caption ── */
+        .v2-caption {
+            font-size: 0.72rem;
+            color: #9CA3AF;
+            margin-bottom: 1.5rem;
+        }
+
+        /* ── Hide Streamlit chrome ── */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================================
+# SECTION 4 — DATA LOADING
+# ============================================================================
+
+@st.cache_data
+def load_data() -> pd.DataFrame:
+    """Load, clean, and return the Excel data."""
+    file_path = _find_excel_file()
+    log_info(f"Loading data from {file_path}")
+
+    try:
+        df = pd.read_excel(
+            file_path,
+            sheet_name=SHEET_NAME,
+            header=HEADER_ROW,
+            engine="openpyxl",
+        )
+    except FileNotFoundError:
+        st.error(f"File not found: {file_path}")
+        log_error(f"File not found: {file_path}")
+        st.stop()
+    except ValueError as e:
+        st.error(f"Error reading Excel sheet '{SHEET_NAME}': {e}")
+        log_error(f"Sheet error: {e}")
+        st.stop()
+
+    log_info(f"Loaded {len(df)} rows, {len(df.columns)} columns")
+
+    rename_map = {k: v for k, v in COLUMN_MAP.items() if k in df.columns}
+    df = df.rename(columns=rename_map)
+    log_info(f"Renamed columns: {list(rename_map.values())}")
+
+    if "Self Counter" in df.columns:
+        before = len(df)
+        df["Self Counter"] = df["Self Counter"].fillna("").astype(str).str.strip().str.title()
+        df = df[df["Self Counter"] != "Yes"].copy()
+        excluded = before - len(df)
+        log_info(f"Excluded {excluded} self-counter dealers ({len(df)} remaining)")
+
+    numeric_cols = [
+        "Qualified Volume", "Total Site Volume", "Qualified Points",
+        "Shop Volume", "Site Volume", "Q4 Volume", "Unique Site >200 MT",
+    ]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    text_cols = ["Dealer Name", "Distributor Name", "State", "District", "Zone"]
+    for col in text_cols:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .str.title()
+                .replace({"Nan": "", "None": "", "0": "", "0.0": ""})
+            )
+
+    if "Shop Volume" in df.columns and "Site Volume" in df.columns:
+        df["Total Volume"] = df["Shop Volume"] + df["Site Volume"]
+    elif "Q4 Volume" in df.columns:
+        df["Total Volume"] = df["Q4 Volume"]
+    else:
+        df["Total Volume"] = 0.0
+
+    if "Qualified Points" in df.columns:
+        df["Qualified Slab"] = df["Qualified Points"].apply(assign_slab)
+    elif "Current Slab" in df.columns:
+        df["Current Slab"] = df["Current Slab"].fillna("-").astype(str).str.strip()
+        df["Qualified Slab"] = df["Current Slab"].map(SLAB_CODE_MAP).fillna("Unqualified")
+    else:
+        df["Qualified Slab"] = "Unqualified"
+
+    df["Next Upgrade Slab"] = df["Qualified Slab"].apply(get_next_slab)
+    if "Qualified Points" in df.columns:
+        df["Points to Next Slab"] = df.apply(
+            lambda row: points_to_next(row["Qualified Points"], row["Qualified Slab"]),
+            axis=1,
+        )
+
+    log_info(f"Data loading complete. Shape: {df.shape}")
+    return df
+
+
+# ============================================================================
+# SECTION 5 — CASCADING FILTERS
+# ============================================================================
+
+def _opts(series: pd.Series) -> list[str]:
+    """Build filter options: ['All'] + sorted unique non-blank values."""
+    unique_vals = series[series.astype(str).str.strip() != ""].unique()
+    return ["All"] + sorted(str(v) for v in unique_vals if str(v).strip())
+
+
+def render_cascading_filters(
+    df: pd.DataFrame,
+    key: str,
+    filter_fields: Optional[list[str]] = None,
+) -> pd.DataFrame:
+    """Render cascading dropdown filters and return the filtered DataFrame."""
+    if filter_fields is None:
+        filter_fields = [
+            col for col in ["Qualified Slab", "Zone", "State", "District", "Distributor Name"]
+            if col in df.columns
+        ]
+
+    filter_fields = [f for f in filter_fields if f in df.columns]
+
+    if not filter_fields:
+        return df
+
+    cols = st.columns(len(filter_fields))
+    filtered = df.copy()
+
+    for i, field in enumerate(filter_fields):
+        with cols[i]:
+            options = _opts(filtered[field])
+            selected = st.selectbox(
+                field,
+                options,
+                key=f"{key}_{field}",
+            )
+            if selected != "All":
+                filtered = filtered[filtered[field] == selected]
+
+    return filtered
+
+
+# ============================================================================
+# SECTION 6 — TAB: SUMMARY
+# ============================================================================
+
+def render_kpi_row(df: pd.DataFrame) -> None:
+    """Render the top KPI metrics in minimalist style."""
+    total_dealers = len(df)
+    total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
+    total_shop_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
+    total_site_vol = df["Site Volume"].sum() if "Site Volume" in df.columns else 0
+    total_qual_vol = df["Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
+    total_points = df["Qualified Points"].sum() if "Qualified Points" in df.columns else 0
+
+    kpi_cols = st.columns(6)
+    kpis = [
+        ("Total Dealers", format_indian(total_dealers)),
+        ("Total Volume (MT)", format_indian(total_volume, decimal=1)),
+        ("Qual. Shop Vol. (MT)", format_indian(total_shop_vol, decimal=1)),
+        ("Qual. Site Vol. (MT)", format_indian(total_site_vol, decimal=1)),
+        ("Qualified Volume (MT)", format_indian(total_qual_vol, decimal=1)),
+        ("Total Qualified Points", format_indian(total_points, decimal=1)),
+    ]
+    for col, (label, value) in zip(kpi_cols, kpis):
+        with col:
+            st.markdown(
+                f"""
+                <div class="v2-kpi">
+                    <div class="v2-kpi-value">{value}</div>
+                    <div class="v2-kpi-label">{label}</div>
+                    <div class="v2-kpi-divider"></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def render_slab_cards(df: pd.DataFrame) -> None:
+    """Render slab distribution cards in minimalist style."""
+    if "Qualified Slab" not in df.columns:
+        return
+
+    slab_counts = df["Qualified Slab"].value_counts()
+    card_cols = st.columns(len(SLAB_CONFIG))
+    for col, cfg in zip(card_cols, SLAB_CONFIG):
+        count = int(slab_counts.get(cfg["slab"], 0))
+        color = cfg["color"]
+        with col:
+            st.markdown(
+                f"""
+                <div class="v2-slab">
+                    <div class="v2-slab-count">{count}</div>
+                    <div class="v2-slab-name">
+                        <span class="v2-slab-dot" style="background-color: {color};"></span>
+                        {cfg['slab']}
+                    </div>
+                    <div class="v2-slab-range">{cfg['range']} pts</div>
+                    <div class="v2-slab-gift">{cfg['gift']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def render_summary(df: pd.DataFrame) -> None:
+    """Render the Summary tab with slab breakdown table."""
+    st.markdown('<div class="v2-section-title">Slab Breakdown</div>', unsafe_allow_html=True)
+
+    summary_rows = []
+    grand_count = 0
+    grand_vol = 0.0
+    grand_shop_vol = 0.0
+    grand_site_vol = 0.0
+    grand_qual_vol = 0.0
+    grand_pts = 0.0
+
+    for cfg in SLAB_CONFIG:
+        slab_df = df[df["Qualified Slab"] == cfg["slab"]]
+        count = len(slab_df)
+        vol = slab_df["Total Volume"].sum() if "Total Volume" in slab_df.columns else 0
+        shop_vol = slab_df["Shop Volume"].sum() if "Shop Volume" in slab_df.columns else 0
+        site_vol = slab_df["Site Volume"].sum() if "Site Volume" in slab_df.columns else 0
+        qual_vol = slab_df["Qualified Volume"].sum() if "Qualified Volume" in slab_df.columns else 0
+        pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
+        grand_count += count
+        grand_vol += vol
+        grand_shop_vol += shop_vol
+        grand_site_vol += site_vol
+        grand_qual_vol += qual_vol
+        grand_pts += pts
+        summary_rows.append({
+            "Slab": cfg["slab"],
+            "Points Range": cfg["range"],
+            "Dealer Count": count,
+            "Total Volume": format_indian(vol, decimal=1),
+            "Qual. Shop Vol.": format_indian(shop_vol, decimal=1),
+            "Qual. Site Vol.": format_indian(site_vol, decimal=1),
+            "Qualified Volume": format_indian(qual_vol, decimal=1),
+            "Total Points": format_indian(pts, decimal=1),
+            "Gift": cfg["gift_full"],
+        })
+
+    summary_rows.append({
+        "Slab": "TOTAL",
+        "Points Range": "",
+        "Dealer Count": grand_count,
+        "Total Volume": format_indian(grand_vol, decimal=1),
+        "Qual. Shop Vol.": format_indian(grand_shop_vol, decimal=1),
+        "Qual. Site Vol.": format_indian(grand_site_vol, decimal=1),
+        "Qualified Volume": format_indian(grand_qual_vol, decimal=1),
+        "Total Points": format_indian(grand_pts, decimal=1),
+        "Gift": "",
+    })
+
+    summary_df = pd.DataFrame(summary_rows)
+
+    def _style_summary_row(row: pd.Series) -> list[str]:
+        """Apply minimal styling to summary rows."""
+        slab = row.get("Slab", "")
+        if slab == "TOTAL":
+            return ["font-weight: 700; background-color: #F3F4F6; color: #111111"] * len(row)
+        return [""] * len(row)
+
+    def _bold_summary_columns(col: pd.Series) -> list[str]:
+        """Bold key summary columns."""
+        if col.name in ("Slab", "Dealer Count", "Total Points"):
+            return ["font-weight: 600"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        summary_df.style
+        .apply(_style_summary_row, axis=1)
+        .apply(_bold_summary_columns, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True)
+
+
+# ============================================================================
+# SECTION 7 — TAB: DEALER DETAILS
+# ============================================================================
+
+def _calc_vol_to_achieve(slab: str, total_volume: float) -> float:
+    """Calculate volume remaining to reach the next slab tier."""
+    next_vol = NEXT_SLAB_VOLUME.get(slab)
+    if next_vol is None:
+        return 0
+    vol = float(total_volume) if not pd.isna(total_volume) else 0.0
+    gap = next_vol - vol
+    return max(gap, 0)
+
+
+def render_dealer_details(df: pd.DataFrame) -> None:
+    """Render the Dealer Details tab with per-dealer table and filters."""
+    detail_filters = ["Distributor Name", "State", "Dealer Name", "Qualified Slab"]
+    _all_cols = st.columns(len(detail_filters) + 1)
+    filtered = df.copy()
+
+    for i, field in enumerate(detail_filters):
+        with _all_cols[i]:
+            options = _opts(filtered[field])
+            selected = st.selectbox(
+                field,
+                options,
+                key=f"v2_dealer_detail_{field}",
+            )
+            if selected != "All":
+                filtered = filtered[filtered[field] == selected]
+
+    _vol_options = ["All", "0 - 20 MT", "21 - 40 MT", "41 - 60 MT", "61 - 100 MT", "More than 100 MT"]
+    with _all_cols[-1]:
+        _vol_sel = st.selectbox("Vol. to Achieve", _vol_options, key="v2_dealer_detail_vol_achieve")
+
+    if _vol_sel != "All":
+        _temp_vol = filtered.apply(
+            lambda row: _calc_vol_to_achieve(
+                row.get("Qualified Slab", ""),
+                row.get("Total Volume", 0),
+            ),
+            axis=1,
+        )
+        _range_map: dict[str, tuple[float, float]] = {
+            "0 - 20 MT": (0, 20),
+            "21 - 40 MT": (21, 40),
+            "41 - 60 MT": (41, 60),
+            "61 - 100 MT": (61, 100),
+            "More than 100 MT": (101, float("inf")),
+        }
+        _lo, _hi = _range_map[_vol_sel]
+        filtered = filtered[(_temp_vol >= _lo) & (_temp_vol <= _hi)]
+
+    if filtered.empty:
+        st.info("No data matches the selected filters.")
+        return
+
+    source_cols = [
+        c for c in [
+            "Dealer Name", "Distributor Name", "State", "Zone",
+            "Shop Volume", "Site Volume", "Total Volume",
+            "Qualified Slab", "Next Upgrade Slab",
+            "Qualified Points",
+        ]
+        if c in filtered.columns
+    ]
+
+    st.markdown(
+        f'<div class="v2-section-title">Dealer Details — {len(filtered)} records</div>',
+        unsafe_allow_html=True,
+    )
+
+    display_df = filtered[source_cols].copy()
+
+    rename_map: dict[str, str] = {
+        "Shop Volume": "Qual. Shop Vol.",
+        "Site Volume": "Qual. Site Vol.",
+        "Next Upgrade Slab": "Next Slab",
+    }
+    display_df = display_df.rename(columns=rename_map)
+
+    if "Next Slab" in display_df.columns:
+        display_df["Next Slab"] = display_df["Next Slab"].fillna("-")
+
+    display_df["Vol. to Achieve"] = display_df.apply(
+        lambda row: _calc_vol_to_achieve(
+            row.get("Qualified Slab", ""),
+            row.get("Total Volume", 0),
+        ),
+        axis=1,
+    )
+
+    ordered_cols = [
+        c for c in [
+            "Dealer Name", "Distributor Name", "State", "Zone",
+            "Qual. Shop Vol.", "Qual. Site Vol.", "Total Volume",
+            "Qualified Slab", "Next Slab", "Vol. to Achieve", "Qualified Points",
+        ]
+        if c in display_df.columns
+    ]
+    display_df = display_df[ordered_cols]
+
+    num_cols = [
+        "Qual. Shop Vol.", "Qual. Site Vol.", "Total Volume",
+        "Vol. to Achieve", "Qualified Points",
+    ]
+    for col in num_cols:
+        if col in display_df.columns:
+            display_df[col] = pd.to_numeric(
+                display_df[col], errors="coerce"
+            ).fillna(0).round(0).astype(int)
+
+    def _highlight_by_slab(row: pd.Series) -> list[str]:
+        """Apply subtle slab-based styling to each row."""
+        for field in ["Dealer Name", "Distributor Name"]:
+            val = row.get(field)
+            if isinstance(val, str) and "total" in val.lower():
+                return ["font-weight: 600; background-color: #F3F4F6"] * len(row)
+        return [""] * len(row)
+
+    def _bold_key_columns(col: pd.Series) -> list[str]:
+        """Bold key columns."""
+        if col.name in ("Dealer Name", "Qualified Slab", "Qualified Points",
+                         "Next Slab", "Vol. to Achieve"):
+            return ["font-weight: 600"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        display_df.style
+        .apply(_highlight_by_slab, axis=1)
+        .apply(_bold_key_columns, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
+
+
+# ============================================================================
+# SECTION 8 — MAIN
+# ============================================================================
+
+def main() -> None:
+    """Entry point for the Minimalist V2 Streamlit dashboard."""
+    st.set_page_config(
+        page_title="Q4 Scheme Dashboard — V2",
+        layout="wide",
+        page_icon="Q4",
+    )
+
+    inject_minimalist_css()
+
+    # --- Header ---
+    st.markdown(
+        """
+        <div class="v2-header">
+            <h1>Q4 Scheme Dashboard</h1>
+            <div class="v2-header-right">
+                <span class="v2-header-subtitle">Slab Analysis & Dealer Tracker</span>
+                <span class="v2-header-badge">Q4 FY 26</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --- Load Data ---
+    df = load_data()
+
+    # --- File info ---
+    file_path = _find_excel_file()
+    st.markdown(
+        f'<div class="v2-caption">Data source: {file_path.name} — {len(df)} dealers loaded (excl. self-counter)</div>',
+        unsafe_allow_html=True,
+    )
+
+    # --- Global Cascading Filters ---
+    summary_filters = ["Qualified Slab", "Zone", "State", "District", "Distributor Name"]
+    filtered_df = render_cascading_filters(df, key="v2_global", filter_fields=summary_filters)
+
+    # --- KPI Row ---
+    render_kpi_row(filtered_df)
+
+    # --- Separator ---
+    st.markdown('<hr class="v2-separator">', unsafe_allow_html=True)
+
+    # --- Slab Distribution ---
+    render_slab_cards(filtered_df)
+
+    # --- Separator ---
+    st.markdown('<hr class="v2-separator">', unsafe_allow_html=True)
+
+    # --- Tabs ---
+    tab_summary, tab_details = st.tabs([
+        "Summary",
+        "Dealer Details",
+    ])
+
+    with tab_summary:
+        render_summary(filtered_df)
+
+    with tab_details:
+        render_dealer_details(filtered_df)
+
+
+if __name__ == "__main__":
+    main()
