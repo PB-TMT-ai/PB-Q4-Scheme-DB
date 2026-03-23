@@ -306,7 +306,17 @@ def inject_custom_css() -> None:
             font-weight: 700;
             color: #ffffff;
         }
-        .header-bar span {
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .header-subtitle {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #cbd5e1;
+        }
+        .header-badge {
             font-size: 0.85rem;
             font-weight: 600;
             color: #ffffff;
@@ -933,8 +943,11 @@ def main() -> None:
     st.markdown(
         """
         <div class="header-bar">
-            <h1>Slab Analysis & Dealer Tracker</h1>
-            <span>Q4 FY'26</span>
+            <h1>Q4 Scheme Dashboard</h1>
+            <div class="header-right">
+                <span class="header-subtitle">Slab Analysis & Dealer Tracker</span>
+                <span class="header-badge">Q4 FY'26</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
