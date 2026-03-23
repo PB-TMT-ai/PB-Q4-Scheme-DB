@@ -943,10 +943,10 @@ def main() -> None:
     st.markdown(
         """
         <div class="header-bar">
-            <h1>Q4 Scheme Dashboard</h1>
+            <h1>📊 Q4 Scheme Dashboard</h1>
             <div class="header-right">
                 <span class="header-subtitle">Slab Analysis & Dealer Tracker</span>
-                <span class="header-badge">Q4 FY'26</span>
+                <span class="header-badge">Q4 FY 26</span>
             </div>
         </div>
         """,
