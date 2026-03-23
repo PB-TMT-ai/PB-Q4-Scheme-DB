@@ -60,8 +60,9 @@ cascading filters, and Plotly visualizations.
 - Widget keys prefixed with `v2_` to avoid state conflicts with V1
 - CSS classes prefixed with `v2-` (v2-header, v2-bento-card, v2-slab, v2-section-title)
 
-## Deployment
-- Deployed on Streamlit Community Cloud from `base` branch
+## Deployment — CRITICAL
+- Deployed on **Streamlit Community Cloud** from the **`base` branch ONLY**
 - Main file: `app_v2.py`
+- **ALWAYS after finishing work**: Create a PR to merge the feature branch into `base` and remind the user to merge it, otherwise changes will NOT be visible on the web app
 - Streamlit Cloud may not show all branches in dropdown — use well-known branches like `base`
-- Merge feature branches into `base` via GitHub PR before deploying
+- Do NOT assume pushing to the feature branch will update the live app — it won't
