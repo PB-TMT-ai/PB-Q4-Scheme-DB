@@ -1581,14 +1581,30 @@ def main() -> None:
     # --- Summary on top (filtered) ---
     render_summary_top(filtered_df)
 
+    # --- Sidebar PIN for Costing ---
+    with st.sidebar:
+        st.markdown("**Admin Access**")
+        pin_input = st.text_input("Enter PIN to unlock Costing", type="password", key="costing_pin")
+        show_costing = pin_input == "0000"
+        if pin_input and not show_costing:
+            st.error("Incorrect PIN")
+
     # --- Tabs ---
-    tab_summary, tab_details, tab_upgrade, tab_performance, tab_costing = st.tabs([
-        "📊 Summary",
-        "🔍 Dealer Details",
-        "🎯 Near-Upgrade",
-        "📈 Performance Overview",
-        "💰 Costing",
-    ])
+    if show_costing:
+        tab_summary, tab_details, tab_upgrade, tab_performance, tab_costing = st.tabs([
+            "📊 Summary",
+            "🔍 Dealer Details",
+            "🎯 Near-Upgrade",
+            "📈 Performance Overview",
+            "💰 Costing",
+        ])
+    else:
+        tab_summary, tab_details, tab_upgrade, tab_performance = st.tabs([
+            "📊 Summary",
+            "🔍 Dealer Details",
+            "🎯 Near-Upgrade",
+            "📈 Performance Overview",
+        ])
 
     with tab_summary:
         render_summary(filtered_df)
@@ -1602,8 +1618,9 @@ def main() -> None:
     with tab_performance:
         render_performance_overview(filtered_df)
 
-    with tab_costing:
-        render_costing(filtered_df)
+    if show_costing:
+        with tab_costing:
+            render_costing(filtered_df)
 
 
 if __name__ == "__main__":

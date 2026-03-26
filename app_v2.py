@@ -1159,12 +1159,26 @@ def main() -> None:
 
     st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
 
+    # --- Sidebar PIN for Costing ---
+    with st.sidebar:
+        st.markdown("**Admin Access**")
+        pin_input = st.text_input("Enter PIN to unlock Costing", type="password", key="v2_costing_pin")
+        show_costing = pin_input == "0000"
+        if pin_input and not show_costing:
+            st.error("Incorrect PIN")
+
     # --- Tabs ---
-    tab_summary, tab_details, tab_costing = st.tabs([
-        "Summary",
-        "Dealer Details",
-        "Costing",
-    ])
+    if show_costing:
+        tab_summary, tab_details, tab_costing = st.tabs([
+            "Summary",
+            "Dealer Details",
+            "Costing",
+        ])
+    else:
+        tab_summary, tab_details = st.tabs([
+            "Summary",
+            "Dealer Details",
+        ])
 
     with tab_summary:
         render_summary(filtered_df)
@@ -1172,8 +1186,9 @@ def main() -> None:
     with tab_details:
         render_dealer_details(filtered_df)
 
-    with tab_costing:
-        render_costing(filtered_df)
+    if show_costing:
+        with tab_costing:
+            render_costing(filtered_df)
 
 
 if __name__ == "__main__":
