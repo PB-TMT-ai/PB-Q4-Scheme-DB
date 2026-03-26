@@ -548,10 +548,11 @@ def load_data() -> pd.DataFrame:
                 .replace({"Nan": "", "None": "", "0": "", "0.0": ""})
             )
 
-    if "Shop Volume" in df.columns and "Site Volume" in df.columns:
-        df["Total Volume"] = df["Shop Volume"] + df["Site Volume"]
-    elif "Q4 Volume" in df.columns:
+    # --- Total Volume (Jan + Feb + Mar) ---
+    if "Q4 Volume" in df.columns:
         df["Total Volume"] = df["Q4 Volume"]
+    elif "Shop Volume" in df.columns and "Site Volume" in df.columns:
+        df["Total Volume"] = df["Shop Volume"] + df["Site Volume"]
     else:
         df["Total Volume"] = 0.0
 
@@ -627,7 +628,7 @@ def render_kpi_row(df: pd.DataFrame) -> None:
     total_dealers = len(df)
     total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
     total_shop_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
-    total_site_vol = df["Site Volume"].sum() if "Site Volume" in df.columns else 0
+    total_site_vol = df["Total Site Volume"].sum() if "Total Site Volume" in df.columns else 0
     total_qual_vol = df["Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
     total_points = df["Qualified Points"].sum() if "Qualified Points" in df.columns else 0
 
@@ -754,7 +755,7 @@ def render_summary(df: pd.DataFrame) -> None:
         count = len(slab_df)
         vol = slab_df["Total Volume"].sum() if "Total Volume" in slab_df.columns else 0
         shop_vol = slab_df["Shop Volume"].sum() if "Shop Volume" in slab_df.columns else 0
-        site_vol = slab_df["Site Volume"].sum() if "Site Volume" in slab_df.columns else 0
+        site_vol = slab_df["Total Site Volume"].sum() if "Total Site Volume" in slab_df.columns else 0
         qual_vol = slab_df["Qualified Volume"].sum() if "Qualified Volume" in slab_df.columns else 0
         pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
         grand_count += count
@@ -870,7 +871,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     source_cols = [
         c for c in [
             "Dealer Name", "Distributor Name", "State", "Zone",
-            "Shop Volume", "Site Volume", "Total Volume",
+            "Shop Volume", "Total Site Volume", "Total Volume",
             "Qualified Slab", "Next Upgrade Slab",
             "Qualified Points",
         ]
@@ -886,7 +887,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
 
     rename_map: dict[str, str] = {
         "Shop Volume": "Qual. Shop Vol.",
-        "Site Volume": "Qual. Site Vol.",
+        "Total Site Volume": "Qual. Site Vol.",
         "Next Upgrade Slab": "Next Slab",
     }
     display_df = display_df.rename(columns=rename_map)
