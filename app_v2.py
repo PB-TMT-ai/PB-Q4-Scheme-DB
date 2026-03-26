@@ -28,6 +28,7 @@ from src.lib.logger import info as log_info
 # ============================================================================
 
 DATA_DIR: str = "data"
+DATA_FILE: str = "Q4 as on 25th Mar.xlsx"
 SHEET_NAME: str = "Sheet1"
 HEADER_ROW: int = 0
 
@@ -49,7 +50,16 @@ COLUMN_MAP: dict[str, str] = {
 
 
 def _find_excel_file() -> Path:
-    """Locate the most recently modified Excel file in DATA_DIR."""
+    """Locate the configured Excel data file in DATA_DIR.
+
+    Uses the explicit DATA_FILE constant if the file exists, otherwise
+    falls back to the most recently modified .xlsx file.
+    """
+    explicit = Path(DATA_DIR) / DATA_FILE
+    if explicit.exists():
+        log_info(f"Using data file: {explicit}")
+        return explicit
+
     pattern = str(Path(DATA_DIR) / "*.xlsx")
     files = glob.glob(pattern)
     if not files:
