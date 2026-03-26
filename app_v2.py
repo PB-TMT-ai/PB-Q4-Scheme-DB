@@ -551,8 +551,8 @@ def load_data() -> pd.DataFrame:
     # --- Total Volume (Jan + Feb + Mar) ---
     if "Q4 Volume" in df.columns:
         df["Total Volume"] = df["Q4 Volume"]
-    elif "Shop Volume" in df.columns and "Site Volume" in df.columns:
-        df["Total Volume"] = df["Shop Volume"] + df["Site Volume"]
+    elif "Shop Volume" in df.columns and "Total Site Volume" in df.columns:
+        df["Total Volume"] = df["Shop Volume"] + df["Total Site Volume"]
     else:
         df["Total Volume"] = 0.0
 
