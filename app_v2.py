@@ -1174,7 +1174,7 @@ def main() -> None:
         # --- PIN unlock for Costing ---
         st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
         pin_input = st.text_input("Enter PIN to unlock Costing", type="password", key="v2_costing_pin")
-        if pin_input == "0000":
+        if pin_input == "4141":
             render_costing(filtered_df)
         elif pin_input:
             st.error("Incorrect PIN")
