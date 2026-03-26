@@ -493,7 +493,7 @@ def inject_bento_css() -> None:
 # SECTION 4 — DATA LOADING
 # ============================================================================
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_data() -> pd.DataFrame:
     """Load, clean, and return the Excel data."""
     file_path = _find_excel_file()
