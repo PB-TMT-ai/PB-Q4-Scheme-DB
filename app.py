@@ -95,6 +95,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 0,
         "color": "#94a3b8",
         "color_light": "#f1f5f9",
+        "gift_inr": 0,
+        "threshold_points": 0,
     },
     {
         "slab": "Slab A",
@@ -108,6 +110,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 30,
         "color": "#f59e0b",
         "color_light": "#fef3c7",
+        "gift_inr": 3750,
+        "threshold_points": 750,
     },
     {
         "slab": "Slab B",
@@ -121,6 +125,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 120,
         "color": "#6366f1",
         "color_light": "#e0e7ff",
+        "gift_inr": 15000,
+        "threshold_points": 3000,
     },
     {
         "slab": "Slab C",
@@ -134,6 +140,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 168,
         "color": "#10b981",
         "color_light": "#d1fae5",
+        "gift_inr": 21000,
+        "threshold_points": 4200,
     },
     {
         "slab": "Slab D",
@@ -147,6 +155,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 272,
         "color": "#3b82f6",
         "color_light": "#dbeafe",
+        "gift_inr": 34000,
+        "threshold_points": 6800,
     },
     {
         "slab": "Slab E",
@@ -160,6 +170,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 300,
         "color": "#ec4899",
         "color_light": "#fce7f3",
+        "gift_inr": 37500,
+        "threshold_points": 7500,
     },
 ]
 
@@ -168,6 +180,10 @@ SLAB_GIFT_MAP: dict[str, str] = {s["slab"]: s["gift_full"] for s in SLAB_CONFIG}
 SLAB_COLORS: dict[str, str] = {s["slab"]: s["color"] for s in SLAB_CONFIG}
 SLAB_COLORS_LIGHT: dict[str, str] = {s["slab"]: s["color_light"] for s in SLAB_CONFIG}
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
+SLAB_GIFT_INR: dict[str, int] = {s["slab"]: s["gift_inr"] for s in SLAB_CONFIG}
+SLAB_THRESHOLD_PTS: dict[str, int] = {s["slab"]: s["threshold_points"] for s in SLAB_CONFIG}
+
+TOTAL_RETAIL_SALES: float = 42126.0
 
 # Map Excel slab codes (A, B, C, ...) to full slab names
 SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
@@ -1371,7 +1387,145 @@ def render_performance_overview(df: pd.DataFrame) -> None:
 
 
 # ============================================================================
-# SECTION 10 — MAIN
+# SECTION 10 — TAB: COSTING ANALYSIS
+# ============================================================================
+
+def render_costing(df: pd.DataFrame) -> None:
+    """Render the Costing Analysis tab with gift cost and per-MT breakdown.
+
+    Gift cost formula: Gifts = Total Points in Slab / Slab Threshold Points,
+    then Total Cost = Gifts x Gift Value (INR).
+
+    Args:
+        df: Filtered DataFrame.
+    """
+    if df.empty:
+        st.info("No data available for costing analysis.")
+        return
+
+    # --- Compute costing per slab ---
+    costing_rows = []
+    grand_dealers = 0
+    grand_points = 0.0
+    grand_gifts = 0
+    grand_cost = 0.0
+
+    for cfg in SLAB_CONFIG:
+        slab_df = df[df["Qualified Slab"] == cfg["slab"]]
+        count = len(slab_df)
+        total_pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
+        threshold = cfg["threshold_points"]
+        gift_inr = cfg["gift_inr"]
+
+        if threshold > 0 and total_pts > 0:
+            gifts = int(total_pts / threshold)
+            cost = gifts * gift_inr
+        else:
+            gifts = 0
+            cost = 0
+
+        grand_dealers += count
+        grand_points += total_pts
+        grand_gifts += gifts
+        grand_cost += cost
+
+        costing_rows.append({
+            "Slab": cfg["slab"],
+            "Points Range": cfg["range"],
+            "Dealers": count,
+            "Total Points": format_indian(total_pts),
+            "Threshold Pts": format_indian(threshold) if threshold > 0 else "-",
+            "Gifts": format_indian(gifts),
+            "Gift Value (INR)": format_indian(gift_inr, prefix="₹") if gift_inr > 0 else "-",
+            "Total Cost (INR)": format_indian(cost, prefix="₹"),
+            "% of Total": f"{cost / grand_cost * 100:.1f}%" if grand_cost > 0 else "0%",
+        })
+
+    # Recalculate % after grand total is known
+    for row in costing_rows:
+        cost_str = row["Total Cost (INR)"]
+        # Find actual cost from the slab
+        slab_name = row["Slab"]
+        cfg = next(c for c in SLAB_CONFIG if c["slab"] == slab_name)
+        slab_df = df[df["Qualified Slab"] == slab_name]
+        total_pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
+        threshold = cfg["threshold_points"]
+        gift_inr = cfg["gift_inr"]
+        if threshold > 0 and total_pts > 0:
+            cost = int(total_pts / threshold) * gift_inr
+        else:
+            cost = 0
+        row["% of Total"] = f"{cost / grand_cost * 100:.1f}%" if grand_cost > 0 else "0%"
+
+    per_mt = grand_cost / TOTAL_RETAIL_SALES if TOTAL_RETAIL_SALES > 0 else 0
+
+    # --- KPI cards ---
+    st.markdown('<div class="section-title">Costing Overview</div>', unsafe_allow_html=True)
+
+    kpi_cols = st.columns(4)
+    kpis = [
+        ("Total Gifting Cost", format_indian(grand_cost, prefix="₹")),
+        ("Cost per MT", f"₹{per_mt:,.2f}"),
+        ("Total Gifts", format_indian(grand_gifts)),
+        ("Total Retail Sales (MT)", format_indian(TOTAL_RETAIL_SALES)),
+    ]
+    for col, (label, value) in zip(kpi_cols, kpis):
+        with col:
+            st.markdown(
+                f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+
+    # --- TOTAL row ---
+    costing_rows.append({
+        "Slab": "TOTAL",
+        "Points Range": "",
+        "Dealers": grand_dealers,
+        "Total Points": format_indian(grand_points),
+        "Threshold Pts": "",
+        "Gifts": format_indian(grand_gifts),
+        "Gift Value (INR)": "",
+        "Total Cost (INR)": format_indian(grand_cost, prefix="₹"),
+        "% of Total": "100%",
+    })
+
+    # --- Table ---
+    st.subheader("Slab-wise Costing Breakdown")
+    costing_df = pd.DataFrame(costing_rows)
+
+    def _style_costing_row(row: pd.Series) -> list[str]:
+        """Apply styling to costing table rows."""
+        slab = row.get("Slab", "")
+        if slab == "TOTAL":
+            return ["font-weight: 800; background-color: #cbd5e1; color: #0f172a"] * len(row)
+        bg = SLAB_COLORS_LIGHT.get(slab, "")
+        if bg:
+            return [f"background-color: {bg}"] * len(row)
+        return [""] * len(row)
+
+    def _bold_costing_cols(col: pd.Series) -> list[str]:
+        """Bold key costing columns."""
+        if col.name in ("Slab", "Gifts", "Total Cost (INR)", "% of Total"):
+            return ["font-weight: 700"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        costing_df.style
+        .apply(_style_costing_row, axis=1)
+        .apply(_bold_costing_cols, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True)
+
+
+# ============================================================================
+# SECTION 11 — MAIN
 # ============================================================================
 
 def main() -> None:
@@ -1418,11 +1572,12 @@ def main() -> None:
     render_summary_top(filtered_df)
 
     # --- Tabs ---
-    tab_summary, tab_details, tab_upgrade, tab_performance = st.tabs([
+    tab_summary, tab_details, tab_upgrade, tab_performance, tab_costing = st.tabs([
         "📊 Summary",
         "🔍 Dealer Details",
         "🎯 Near-Upgrade",
         "📈 Performance Overview",
+        "💰 Costing",
     ])
 
     with tab_summary:
@@ -1436,6 +1591,9 @@ def main() -> None:
 
     with tab_performance:
         render_performance_overview(filtered_df)
+
+    with tab_costing:
+        render_costing(filtered_df)
 
 
 if __name__ == "__main__":
