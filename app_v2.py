@@ -1031,7 +1031,17 @@ def render_costing(df: pd.DataFrame) -> None:
             cost = 0
         row["% of Total"] = f"{cost / grand_cost * 100:.1f}%" if grand_cost > 0 else "0%"
 
-    per_mt = grand_cost / TOTAL_RETAIL_SALES if TOTAL_RETAIL_SALES > 0 else 0
+    # --- Editable Retail Sales input ---
+    retail_sales = st.number_input(
+        "Total Retail Sales (MT)",
+        min_value=0.0,
+        value=TOTAL_RETAIL_SALES,
+        step=100.0,
+        format="%.0f",
+        key="v2_costing_retail_sales",
+    )
+
+    per_mt = grand_cost / retail_sales if retail_sales > 0 else 0
 
     # --- KPI cards ---
     st.markdown('<div class="v2-section-title">Costing Overview</div>', unsafe_allow_html=True)
@@ -1041,7 +1051,7 @@ def render_costing(df: pd.DataFrame) -> None:
         ("Total Gifting Cost", format_indian(grand_cost, prefix="₹")),
         ("Cost per MT", f"₹{per_mt:,.2f}"),
         ("Total Gifts", format_indian(grand_gifts)),
-        ("Total Retail Sales (MT)", format_indian(TOTAL_RETAIL_SALES)),
+        ("Total Retail Sales (MT)", format_indian(retail_sales)),
     ]
     for col, (label, value) in zip(kpi_cols, kpis):
         with col:
