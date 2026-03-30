@@ -46,7 +46,9 @@ COLUMN_MAP: dict[str, str] = {
     "Shop vol.": "Shop Volume",
     "Site vol.": "Site Volume",
     "Total vol. under scheme": "Qualified Volume",
+    "Q4 Vol. under eligible scheme": "Qualified Volume",
     "Total site vol.": "Total Site Volume",
+    "Site vol. under scheme": "Total Site Volume",
     "Points": "Qualified Points",
     "Current gift": "Gift",
     "Current gift slab": "Current Slab",
@@ -199,7 +201,9 @@ def format_indian(number: float, prefix: str = "", decimal: int = 0) -> str:
 
 
 def _find_excel_file() -> Path:
-    """Locate the most recently modified Excel file in DATA_DIR.
+    """Locate the newest Q4 data Excel file in DATA_DIR.
+
+    Priority: newest 'Q4 as on*.xlsx' by name → newest .xlsx by name.
 
     Returns:
         Path to the latest .xlsx file.
@@ -207,11 +211,13 @@ def _find_excel_file() -> Path:
     Raises:
         FileNotFoundError: If no Excel file is found.
     """
-    pattern = str(Path(DATA_DIR) / "*.xlsx")
-    files = glob.glob(pattern)
-    if not files:
+    q4_files = sorted(glob.glob(str(Path(DATA_DIR) / "Q4 as on*.xlsx")), reverse=True)
+    if q4_files:
+        return Path(q4_files[0])
+    all_files = sorted(glob.glob(str(Path(DATA_DIR) / "*.xlsx")))
+    if not all_files:
         raise FileNotFoundError(f"No .xlsx files found in {DATA_DIR}/")
-    return Path(max(files, key=os.path.getmtime))
+    return Path(all_files[-1])
 
 
 # ---------------------------------------------------------------------------

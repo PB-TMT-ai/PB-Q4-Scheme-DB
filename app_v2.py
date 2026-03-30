@@ -28,7 +28,7 @@ from src.lib.logger import info as log_info
 # ============================================================================
 
 DATA_DIR: str = "data"
-DATA_FILE: str = "Q4 as on 25th Mar.xlsx"
+DATA_FILE: str = "Q4 as on 30th Mar.xlsx"
 SHEET_NAME: str = "Sheet1"
 HEADER_ROW: int = 0
 
@@ -39,7 +39,9 @@ COLUMN_MAP: dict[str, str] = {
     "Shop vol.": "Shop Volume",
     "Site vol.": "Site Volume",
     "Total vol. under scheme": "Qualified Volume",
+    "Q4 Vol. under eligible scheme": "Qualified Volume",
     "Total site vol.": "Total Site Volume",
+    "Site vol. under scheme": "Total Site Volume",
     "Points": "Qualified Points",
     "Current gift": "Gift",
     "Current gift slab": "Current Slab",
@@ -52,23 +54,27 @@ COLUMN_MAP: dict[str, str] = {
 def _find_excel_file() -> Path:
     """Locate the configured Excel data file in DATA_DIR.
 
-    Uses the explicit DATA_FILE constant if the file exists, otherwise
-    falls back to the most recently modified .xlsx file.
+    Priority: explicit DATA_FILE → newest 'Q4 as on*.xlsx' by name → newest .xlsx by name.
     """
+    all_xlsx = sorted(glob.glob(str(Path(DATA_DIR) / "*.xlsx")))
+    log_info(f"Excel files in {DATA_DIR}/: {[Path(f).name for f in all_xlsx]}")
+
     explicit = Path(DATA_DIR) / DATA_FILE
     if explicit.exists():
-        log_info(f"Using data file: {explicit}")
+        log_info(f"Using explicit data file: {explicit}")
         return explicit
 
-    pattern = str(Path(DATA_DIR) / "*.xlsx")
-    files = glob.glob(pattern)
-    if not files:
+    q4_files = sorted(glob.glob(str(Path(DATA_DIR) / "Q4 as on*.xlsx")), reverse=True)
+    if q4_files:
+        log_info(f"Fallback: using newest Q4 file by name: {q4_files[0]}")
+        return Path(q4_files[0])
+
+    if not all_xlsx:
         st.error(f"No .xlsx files found in `{DATA_DIR}/`. Please add your data file.")
         log_error(f"No Excel files in {DATA_DIR}/")
         st.stop()
-    latest = max(files, key=os.path.getmtime)
-    log_info(f"Using data file: {latest}")
-    return Path(latest)
+    log_info(f"Fallback: using {all_xlsx[-1]}")
+    return Path(all_xlsx[-1])
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +182,7 @@ SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
 SLAB_GIFT_INR: dict[str, int] = {s["slab"]: s["gift_inr"] for s in SLAB_CONFIG}
 SLAB_THRESHOLD_PTS: dict[str, int] = {s["slab"]: s["threshold_points"] for s in SLAB_CONFIG}
 
-TOTAL_RETAIL_SALES: float = 42126.0
+TOTAL_RETAIL_SALES: float = 47180.0
 
 SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
 
@@ -1140,8 +1146,10 @@ def main() -> None:
 
     # --- File info ---
     file_path = _find_excel_file()
+    _all_data_files = sorted(Path(DATA_DIR).glob("*.xlsx"))
     st.markdown(
-        f'<div class="v2-caption">Data source: {file_path.name} — {len(df)} dealers loaded (excl. self-counter)</div>',
+        f'<div class="v2-caption">Data source: {file_path.name} — {len(df)} dealers loaded (excl. self-counter) '
+        f'| Build: v7 | Files: {[f.name for f in _all_data_files]}</div>',
         unsafe_allow_html=True,
     )
 
