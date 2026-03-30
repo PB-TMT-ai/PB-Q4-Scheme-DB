@@ -1577,7 +1577,11 @@ def main() -> None:
 
     # --- File info ---
     file_path = _find_excel_file()
-    st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter)")
+    _all_data_files = sorted(Path(DATA_DIR).glob("*.xlsx"))
+    st.caption(
+        f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter) "
+        f"| Build: v7 | Files: {[f.name for f in _all_data_files]}"
+    )
 
     # --- Global Cascading Filters ---
     st.markdown(
