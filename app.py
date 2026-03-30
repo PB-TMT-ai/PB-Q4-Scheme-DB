@@ -27,7 +27,7 @@ from src.lib.logger import info as log_info
 # ============================================================================
 
 DATA_DIR: str = "data"
-DATA_FILE: str = "Q4 as on 25th Mar.xlsx"
+DATA_FILE: str = "Q4 as on 30th Mar.xlsx"
 SHEET_NAME: str = "Sheet1"
 HEADER_ROW: int = 0
 
@@ -183,7 +183,7 @@ SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
 SLAB_GIFT_INR: dict[str, int] = {s["slab"]: s["gift_inr"] for s in SLAB_CONFIG}
 SLAB_THRESHOLD_PTS: dict[str, int] = {s["slab"]: s["threshold_points"] for s in SLAB_CONFIG}
 
-TOTAL_RETAIL_SALES: float = 42126.0
+TOTAL_RETAIL_SALES: float = 47180.0
 
 # Map Excel slab codes (A, B, C, ...) to full slab names
 SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
