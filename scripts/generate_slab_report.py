@@ -211,7 +211,11 @@ def _find_excel_file() -> Path:
     Raises:
         FileNotFoundError: If no Excel file is found.
     """
-    q4_files = sorted(glob.glob(str(Path(DATA_DIR) / "Q4 as on*.xlsx")), reverse=True)
+    q4_files = sorted(
+        glob.glob(str(Path(DATA_DIR) / "Q4 data as on*.xlsx"))
+        + glob.glob(str(Path(DATA_DIR) / "Q4 as on*.xlsx")),
+        reverse=True,
+    )
     if q4_files:
         return Path(q4_files[0])
     all_files = sorted(glob.glob(str(Path(DATA_DIR) / "*.xlsx")))

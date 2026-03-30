@@ -27,7 +27,7 @@ from src.lib.logger import info as log_info
 # ============================================================================
 
 DATA_DIR: str = "data"
-DATA_FILE: str = "Q4 as on 30th Mar.xlsx"
+DATA_FILE: str = "Q4 data as on 30th Mar.xlsx"
 SHEET_NAME: str = "Sheet1"
 HEADER_ROW: int = 0
 
@@ -72,8 +72,12 @@ def _find_excel_file() -> Path:
         log_info(f"Using explicit data file: {explicit}")
         return explicit
 
-    # 2. Newest "Q4 as on*.xlsx" by name (descending sort picks latest date)
-    q4_files = sorted(glob.glob(str(Path(DATA_DIR) / "Q4 as on*.xlsx")), reverse=True)
+    # 2. Newest Q4 data file by name (descending sort picks latest date)
+    q4_files = sorted(
+        glob.glob(str(Path(DATA_DIR) / "Q4 data as on*.xlsx"))
+        + glob.glob(str(Path(DATA_DIR) / "Q4 as on*.xlsx")),
+        reverse=True,
+    )
     if q4_files:
         log_info(f"Fallback: using newest Q4 file by name: {q4_files[0]}")
         return Path(q4_files[0])
@@ -1577,11 +1581,7 @@ def main() -> None:
 
     # --- File info ---
     file_path = _find_excel_file()
-    _all_data_files = sorted(Path(DATA_DIR).glob("*.xlsx"))
-    st.caption(
-        f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter) "
-        f"| Build: v7 | Files: {[f.name for f in _all_data_files]}"
-    )
+    st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter)")
 
     # --- Global Cascading Filters ---
     st.markdown(
