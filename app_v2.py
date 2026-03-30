@@ -54,23 +54,27 @@ COLUMN_MAP: dict[str, str] = {
 def _find_excel_file() -> Path:
     """Locate the configured Excel data file in DATA_DIR.
 
-    Uses the explicit DATA_FILE constant if the file exists, otherwise
-    falls back to the most recently modified .xlsx file.
+    Priority: explicit DATA_FILE → newest 'Q4 as on*.xlsx' by name → newest .xlsx by name.
     """
+    all_xlsx = sorted(glob.glob(str(Path(DATA_DIR) / "*.xlsx")))
+    log_info(f"Excel files in {DATA_DIR}/: {[Path(f).name for f in all_xlsx]}")
+
     explicit = Path(DATA_DIR) / DATA_FILE
     if explicit.exists():
-        log_info(f"Using data file: {explicit}")
+        log_info(f"Using explicit data file: {explicit}")
         return explicit
 
-    pattern = str(Path(DATA_DIR) / "*.xlsx")
-    files = glob.glob(pattern)
-    if not files:
+    q4_files = sorted(glob.glob(str(Path(DATA_DIR) / "Q4 as on*.xlsx")), reverse=True)
+    if q4_files:
+        log_info(f"Fallback: using newest Q4 file by name: {q4_files[0]}")
+        return Path(q4_files[0])
+
+    if not all_xlsx:
         st.error(f"No .xlsx files found in `{DATA_DIR}/`. Please add your data file.")
         log_error(f"No Excel files in {DATA_DIR}/")
         st.stop()
-    latest = max(files, key=os.path.getmtime)
-    log_info(f"Using data file: {latest}")
-    return Path(latest)
+    log_info(f"Fallback: using {all_xlsx[-1]}")
+    return Path(all_xlsx[-1])
 
 
 # ---------------------------------------------------------------------------
