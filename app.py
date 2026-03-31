@@ -639,14 +639,6 @@ def load_data() -> pd.DataFrame:
     df = df.rename(columns=rename_map)
     log_info(f"Renamed columns: {list(rename_map.values())}")
 
-    # --- Exclude self-counter dealers ---
-    if "Self Counter" in df.columns:
-        before = len(df)
-        df["Self Counter"] = df["Self Counter"].fillna("").astype(str).str.strip().str.title()
-        df = df[df["Self Counter"] != "Yes"].copy()
-        excluded = before - len(df)
-        log_info(f"Excluded {excluded} self-counter dealers ({len(df)} remaining)")
-
     # --- Coerce numeric columns ---
     numeric_cols = [
         "Qualified Volume", "Total Site Volume", "Qualified Points",
@@ -777,7 +769,8 @@ def render_summary_top(df: pd.DataFrame) -> None:
 
     total_shop_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
     total_site_vol = df["Total Site Volume"].sum() if "Total Site Volume" in df.columns else 0
-    total_qual_vol = df["Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
+    _qual_mask = df["Qualified Slab"] != "Unqualified" if "Qualified Slab" in df.columns else pd.Series([True] * len(df))
+    total_qual_vol = df.loc[_qual_mask, "Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
 
     kpi_cols = st.columns(6)
     kpis = [
@@ -1581,7 +1574,7 @@ def main() -> None:
 
     # --- File info ---
     file_path = _find_excel_file()
-    st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded (excl. self-counter)")
+    st.caption(f"Data source: `{file_path.name}` — {len(df)} dealers loaded")
 
     # --- Global Cascading Filters ---
     st.markdown(

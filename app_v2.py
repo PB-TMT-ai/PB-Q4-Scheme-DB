@@ -547,13 +547,6 @@ def load_data() -> pd.DataFrame:
     df = df.rename(columns=rename_map)
     log_info(f"Renamed columns: {list(rename_map.values())}")
 
-    if "Self Counter" in df.columns:
-        before = len(df)
-        df["Self Counter"] = df["Self Counter"].fillna("").astype(str).str.strip().str.title()
-        df = df[df["Self Counter"] != "Yes"].copy()
-        excluded = before - len(df)
-        log_info(f"Excluded {excluded} self-counter dealers ({len(df)} remaining)")
-
     numeric_cols = [
         "Qualified Volume", "Total Site Volume", "Qualified Points",
         "Shop Volume", "Site Volume", "Q4 Volume", "Unique Site >200 MT",
@@ -655,7 +648,8 @@ def render_kpi_row(df: pd.DataFrame) -> None:
     total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
     total_shop_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
     total_site_vol = df["Total Site Volume"].sum() if "Total Site Volume" in df.columns else 0
-    total_qual_vol = df["Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
+    _qual_mask = df["Qualified Slab"] != "Unqualified" if "Qualified Slab" in df.columns else pd.Series([True] * len(df))
+    total_qual_vol = df.loc[_qual_mask, "Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
     total_points = df["Qualified Points"].sum() if "Qualified Points" in df.columns else 0
 
     # Row 1: 2-wide hero card + 2 standard cards
@@ -1151,7 +1145,7 @@ def main() -> None:
     # --- File info ---
     file_path = _find_excel_file()
     st.markdown(
-        f'<div class="v2-caption">Data source: {file_path.name} — {len(df)} dealers loaded (excl. self-counter)</div>',
+        f'<div class="v2-caption">Data source: {file_path.name} — {len(df)} dealers loaded</div>',
         unsafe_allow_html=True,
     )
 
