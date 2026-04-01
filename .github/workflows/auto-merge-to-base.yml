@@ -30,3 +30,10 @@ jobs:
           git checkout base
           git merge origin/${{ github.ref_name }} --no-edit
           git push origin base
+
+      - name: Sync deployed branch with base
+        if: github.ref_name != 'claude/dealer-slab-color-coding-dFor3'
+        run: |
+          git checkout claude/dealer-slab-color-coding-dFor3
+          git merge base --no-edit
+          git push origin claude/dealer-slab-color-coding-dFor3

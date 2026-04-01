@@ -28,8 +28,9 @@ from src.lib.logger import info as log_info
 # ============================================================================
 
 DATA_DIR: str = "data"
-SHEET_NAME: str = "Sheet1"
-HEADER_ROW: int = 0
+DATA_FILE: str = "Q4 Dealer Scheme till Mar.xlsx"
+SHEET_NAME: str = "Dealer Summary"
+HEADER_ROW: int = 2
 
 COLUMN_MAP: dict[str, str] = {
     "Retailer Name": "Dealer Name",
@@ -38,7 +39,9 @@ COLUMN_MAP: dict[str, str] = {
     "Shop vol.": "Shop Volume",
     "Site vol.": "Site Volume",
     "Total vol. under scheme": "Qualified Volume",
+    "Q4 Vol. under eligible scheme": "Qualified Volume",
     "Total site vol.": "Total Site Volume",
+    "Site vol. under scheme": "Total Site Volume",
     "Points": "Qualified Points",
     "Current gift": "Gift",
     "Current gift slab": "Current Slab",
@@ -49,16 +52,33 @@ COLUMN_MAP: dict[str, str] = {
 
 
 def _find_excel_file() -> Path:
-    """Locate the most recently modified Excel file in DATA_DIR."""
-    pattern = str(Path(DATA_DIR) / "*.xlsx")
-    files = glob.glob(pattern)
-    if not files:
+    """Locate the configured Excel data file in DATA_DIR.
+
+    Priority: explicit DATA_FILE → newest 'Q4 as on*.xlsx' by name → newest .xlsx by name.
+    """
+    all_xlsx = sorted(glob.glob(str(Path(DATA_DIR) / "*.xlsx")))
+    log_info(f"Excel files in {DATA_DIR}/: {[Path(f).name for f in all_xlsx]}")
+
+    explicit = Path(DATA_DIR) / DATA_FILE
+    if explicit.exists():
+        log_info(f"Using explicit data file: {explicit}")
+        return explicit
+
+    q4_files = sorted(
+        glob.glob(str(Path(DATA_DIR) / "Q4 data as on*.xlsx"))
+        + glob.glob(str(Path(DATA_DIR) / "Q4 as on*.xlsx")),
+        reverse=True,
+    )
+    if q4_files:
+        log_info(f"Fallback: using newest Q4 file by name: {q4_files[0]}")
+        return Path(q4_files[0])
+
+    if not all_xlsx:
         st.error(f"No .xlsx files found in `{DATA_DIR}/`. Please add your data file.")
         log_error(f"No Excel files in {DATA_DIR}/")
         st.stop()
-    latest = max(files, key=os.path.getmtime)
-    log_info(f"Using data file: {latest}")
-    return Path(latest)
+    log_info(f"Fallback: using {all_xlsx[-1]}")
+    return Path(all_xlsx[-1])
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +98,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 0,
         "color": "#94a3b8",
         "color_light": "#f1f5f9",
+        "gift_inr": 0,
+        "threshold_points": 0,
     },
     {
         "slab": "Slab A",
@@ -91,6 +113,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 30,
         "color": "#f59e0b",
         "color_light": "#fef3c7",
+        "gift_inr": 3750,
+        "threshold_points": 750,
     },
     {
         "slab": "Slab B",
@@ -104,6 +128,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 120,
         "color": "#6366f1",
         "color_light": "#e0e7ff",
+        "gift_inr": 15000,
+        "threshold_points": 3000,
     },
     {
         "slab": "Slab C",
@@ -117,6 +143,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 168,
         "color": "#10b981",
         "color_light": "#d1fae5",
+        "gift_inr": 21000,
+        "threshold_points": 4200,
     },
     {
         "slab": "Slab D",
@@ -130,6 +158,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 272,
         "color": "#3b82f6",
         "color_light": "#dbeafe",
+        "gift_inr": 34000,
+        "threshold_points": 6800,
     },
     {
         "slab": "Slab E",
@@ -143,6 +173,8 @@ SLAB_CONFIG: list[dict] = [
         "volume_mt": 300,
         "color": "#ec4899",
         "color_light": "#fce7f3",
+        "gift_inr": 37500,
+        "threshold_points": 7500,
     },
 ]
 
@@ -151,6 +183,10 @@ SLAB_GIFT_MAP: dict[str, str] = {s["slab"]: s["gift_full"] for s in SLAB_CONFIG}
 SLAB_COLORS: dict[str, str] = {s["slab"]: s["color"] for s in SLAB_CONFIG}
 SLAB_COLORS_LIGHT: dict[str, str] = {s["slab"]: s["color_light"] for s in SLAB_CONFIG}
 SLAB_ORDER: list[str] = [s["slab"] for s in SLAB_CONFIG]
+SLAB_GIFT_INR: dict[str, int] = {s["slab"]: s["gift_inr"] for s in SLAB_CONFIG}
+SLAB_THRESHOLD_PTS: dict[str, int] = {s["slab"]: s["threshold_points"] for s in SLAB_CONFIG}
+
+TOTAL_RETAIL_SALES: float = 60456.0
 
 SLAB_CODE_MAP: dict[str, str] = {s["slab_code"]: s["slab"] for s in SLAB_CONFIG}
 
@@ -483,7 +519,7 @@ def inject_bento_css() -> None:
 # SECTION 4 — DATA LOADING
 # ============================================================================
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_data() -> pd.DataFrame:
     """Load, clean, and return the Excel data."""
     file_path = _find_excel_file()
@@ -511,13 +547,6 @@ def load_data() -> pd.DataFrame:
     df = df.rename(columns=rename_map)
     log_info(f"Renamed columns: {list(rename_map.values())}")
 
-    if "Self Counter" in df.columns:
-        before = len(df)
-        df["Self Counter"] = df["Self Counter"].fillna("").astype(str).str.strip().str.title()
-        df = df[df["Self Counter"] != "Yes"].copy()
-        excluded = before - len(df)
-        log_info(f"Excluded {excluded} self-counter dealers ({len(df)} remaining)")
-
     numeric_cols = [
         "Qualified Volume", "Total Site Volume", "Qualified Points",
         "Shop Volume", "Site Volume", "Q4 Volume", "Unique Site >200 MT",
@@ -538,10 +567,11 @@ def load_data() -> pd.DataFrame:
                 .replace({"Nan": "", "None": "", "0": "", "0.0": ""})
             )
 
-    if "Shop Volume" in df.columns and "Site Volume" in df.columns:
-        df["Total Volume"] = df["Shop Volume"] + df["Site Volume"]
-    elif "Q4 Volume" in df.columns:
+    # --- Total Volume (Jan + Feb + Mar) ---
+    if "Q4 Volume" in df.columns:
         df["Total Volume"] = df["Q4 Volume"]
+    elif "Shop Volume" in df.columns and "Total Site Volume" in df.columns:
+        df["Total Volume"] = df["Shop Volume"] + df["Total Site Volume"]
     else:
         df["Total Volume"] = 0.0
 
@@ -617,8 +647,9 @@ def render_kpi_row(df: pd.DataFrame) -> None:
     total_dealers = len(df)
     total_volume = df["Total Volume"].sum() if "Total Volume" in df.columns else 0
     total_shop_vol = df["Shop Volume"].sum() if "Shop Volume" in df.columns else 0
-    total_site_vol = df["Site Volume"].sum() if "Site Volume" in df.columns else 0
-    total_qual_vol = df["Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
+    total_site_vol = df["Total Site Volume"].sum() if "Total Site Volume" in df.columns else 0
+    _qual_mask = df["Qualified Slab"] != "Unqualified" if "Qualified Slab" in df.columns else pd.Series([True] * len(df))
+    total_qual_vol = df.loc[_qual_mask, "Qualified Volume"].sum() if "Qualified Volume" in df.columns else 0
     total_points = df["Qualified Points"].sum() if "Qualified Points" in df.columns else 0
 
     # Row 1: 2-wide hero card + 2 standard cards
@@ -744,7 +775,7 @@ def render_summary(df: pd.DataFrame) -> None:
         count = len(slab_df)
         vol = slab_df["Total Volume"].sum() if "Total Volume" in slab_df.columns else 0
         shop_vol = slab_df["Shop Volume"].sum() if "Shop Volume" in slab_df.columns else 0
-        site_vol = slab_df["Site Volume"].sum() if "Site Volume" in slab_df.columns else 0
+        site_vol = slab_df["Total Site Volume"].sum() if "Total Site Volume" in slab_df.columns else 0
         qual_vol = slab_df["Qualified Volume"].sum() if "Qualified Volume" in slab_df.columns else 0
         pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
         grand_count += count
@@ -860,7 +891,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
     source_cols = [
         c for c in [
             "Dealer Name", "Distributor Name", "State", "Zone",
-            "Shop Volume", "Site Volume", "Total Volume",
+            "Shop Volume", "Total Site Volume", "Total Volume",
             "Qualified Slab", "Next Upgrade Slab",
             "Qualified Points",
         ]
@@ -876,7 +907,7 @@ def render_dealer_details(df: pd.DataFrame) -> None:
 
     rename_map: dict[str, str] = {
         "Shop Volume": "Qual. Shop Vol.",
-        "Site Volume": "Qual. Site Vol.",
+        "Total Site Volume": "Qual. Site Vol.",
         "Next Upgrade Slab": "Next Slab",
     }
     display_df = display_df.rename(columns=rename_map)
@@ -936,7 +967,152 @@ def render_dealer_details(df: pd.DataFrame) -> None:
 
 
 # ============================================================================
-# SECTION 8 — MAIN
+# SECTION 8 — TAB: COSTING ANALYSIS
+# ============================================================================
+
+def render_costing(df: pd.DataFrame) -> None:
+    """Render the Costing Analysis tab with gift cost and per-MT breakdown.
+
+    Gift cost formula: Gifts = Total Points in Slab / Slab Threshold Points,
+    then Total Cost = Gifts x Gift Value (INR).
+
+    Args:
+        df: Filtered DataFrame.
+    """
+    if df.empty:
+        st.info("No data available for costing analysis.")
+        return
+
+    # --- Compute costing per slab ---
+    costing_rows = []
+    grand_dealers = 0
+    grand_points = 0.0
+    grand_gifts = 0
+    grand_cost = 0.0
+
+    for cfg in SLAB_CONFIG:
+        slab_df = df[df["Qualified Slab"] == cfg["slab"]]
+        count = len(slab_df)
+        total_pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
+        threshold = cfg["threshold_points"]
+        gift_inr = cfg["gift_inr"]
+
+        if threshold > 0 and total_pts > 0:
+            gifts = int(total_pts / threshold)
+            cost = gifts * gift_inr
+        else:
+            gifts = 0
+            cost = 0
+
+        grand_dealers += count
+        grand_points += total_pts
+        grand_gifts += gifts
+        grand_cost += cost
+
+        costing_rows.append({
+            "Slab": cfg["slab"],
+            "Points Range": cfg["range"],
+            "Dealers": count,
+            "Total Points": format_indian(total_pts),
+            "Threshold Pts": format_indian(threshold) if threshold > 0 else "-",
+            "Gifts": format_indian(gifts),
+            "Gift Value (INR)": format_indian(gift_inr, prefix="₹") if gift_inr > 0 else "-",
+            "Total Cost (INR)": format_indian(cost, prefix="₹"),
+            "% of Total": "0%",
+        })
+
+    # Calculate % after grand total is known
+    for row in costing_rows:
+        slab_name = row["Slab"]
+        cfg = next(c for c in SLAB_CONFIG if c["slab"] == slab_name)
+        slab_df = df[df["Qualified Slab"] == slab_name]
+        total_pts = slab_df["Qualified Points"].sum() if "Qualified Points" in slab_df.columns else 0
+        threshold = cfg["threshold_points"]
+        gift_inr = cfg["gift_inr"]
+        if threshold > 0 and total_pts > 0:
+            cost = int(total_pts / threshold) * gift_inr
+        else:
+            cost = 0
+        row["% of Total"] = f"{cost / grand_cost * 100:.1f}%" if grand_cost > 0 else "0%"
+
+    # --- Editable Retail Sales input ---
+    retail_sales = st.number_input(
+        "Total Retail Sales (MT)",
+        min_value=0.0,
+        value=TOTAL_RETAIL_SALES,
+        step=100.0,
+        format="%.0f",
+        key="v2_costing_retail_sales",
+    )
+
+    per_mt = grand_cost / retail_sales if retail_sales > 0 else 0
+
+    # --- KPI cards ---
+    st.markdown('<div class="v2-section-title">Costing Overview</div>', unsafe_allow_html=True)
+
+    kpi_cols = st.columns(4)
+    kpis = [
+        ("Total Gifting Cost", format_indian(grand_cost, prefix="₹")),
+        ("Cost per MT", f"₹{per_mt:,.2f}"),
+        ("Total Gifts", format_indian(grand_gifts)),
+        ("Total Retail Sales (MT)", format_indian(retail_sales)),
+    ]
+    for col, (label, value) in zip(kpi_cols, kpis):
+        with col:
+            st.markdown(
+                f"""
+                <div class="v2-bento-card">
+                    <div class="v2-kpi">
+                        <div class="v2-kpi-value">{value}</div>
+                        <div class="v2-kpi-label">{label}</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
+
+    # --- TOTAL row ---
+    costing_rows.append({
+        "Slab": "TOTAL",
+        "Points Range": "",
+        "Dealers": grand_dealers,
+        "Total Points": format_indian(grand_points),
+        "Threshold Pts": "",
+        "Gifts": format_indian(grand_gifts),
+        "Gift Value (INR)": "",
+        "Total Cost (INR)": format_indian(grand_cost, prefix="₹"),
+        "% of Total": "100%",
+    })
+
+    # --- Table ---
+    st.markdown('<div class="v2-section-title">Slab-wise Costing Breakdown</div>', unsafe_allow_html=True)
+    costing_df = pd.DataFrame(costing_rows)
+
+    def _style_costing_row(row: pd.Series) -> list[str]:
+        """Apply styling to costing table rows."""
+        slab = row.get("Slab", "")
+        if slab == "TOTAL":
+            return ["font-weight: 700; background-color: #F3F4F6; color: #111111"] * len(row)
+        return [""] * len(row)
+
+    def _bold_costing_cols(col: pd.Series) -> list[str]:
+        """Bold key costing columns."""
+        if col.name in ("Slab", "Gifts", "Total Cost (INR)", "% of Total"):
+            return ["font-weight: 600"] * len(col)
+        return [""] * len(col)
+
+    styled = (
+        costing_df.style
+        .apply(_style_costing_row, axis=1)
+        .apply(_bold_costing_cols, axis=0)
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True)
+
+
+# ============================================================================
+# SECTION 9 — MAIN
 # ============================================================================
 
 def main() -> None:
@@ -969,7 +1145,7 @@ def main() -> None:
     # --- File info ---
     file_path = _find_excel_file()
     st.markdown(
-        f'<div class="v2-caption">Data source: {file_path.name} — {len(df)} dealers loaded (excl. self-counter)</div>',
+        f'<div class="v2-caption">Data source: {file_path.name} — {len(df)} dealers loaded</div>',
         unsafe_allow_html=True,
     )
 
@@ -998,6 +1174,14 @@ def main() -> None:
 
     with tab_details:
         render_dealer_details(filtered_df)
+
+        # --- PIN unlock for Costing ---
+        st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
+        pin_input = st.text_input("Enter PIN to unlock Costing", type="password", key="v2_costing_pin")
+        if pin_input == "4141":
+            render_costing(filtered_df)
+        elif pin_input:
+            st.error("Incorrect PIN")
 
 
 if __name__ == "__main__":
