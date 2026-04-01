@@ -35,8 +35,8 @@ from src.lib.logger import info as log_info
 
 DATA_DIR: str = str(PROJECT_ROOT / "data")
 OUTPUT_DIR: str = str(PROJECT_ROOT / ".workspace")
-SHEET_NAME: str = "Sheet1"
-HEADER_ROW: int = 0
+SHEET_NAME: str = "Dealer Summary"
+HEADER_ROW: int = 2
 
 # Column name mapping: Excel column → internal standard name
 COLUMN_MAP: dict[str, str] = {
